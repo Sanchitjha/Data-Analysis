@@ -57,6 +57,15 @@ pytest                               # DB integration tests run only if TEST_DAT
 `invsales kaggle [--train-csv path] [--items N]` then `invsales etl` switches the source to Kaggle data.
 Compose uses development credentials (`inventory/inventory`); set `POSTGRES_PASSWORD` for anything shared.
 
+## Deploy the dashboard (Streamlit Community Cloud, free)
+Vercel/Netlify are not suitable (they run short-lived serverless functions; Streamlit needs a long-running server).
+The app falls back to the committed `data/clean/*.csv` when no database is reachable, so no database is needed online.
+1. Merge this branch to `main` (or deploy the branch directly).
+2. https://share.streamlit.io → sign in with GitHub → **Create app** → repo `sanchitjha/data-analysis`, branch, main file `app/streamlit_app.py`.
+3. Advanced settings → Python 3.12 → Deploy. Dependencies come from `requirements.txt`.
+4. Put the resulting `*.streamlit.app` URL on your resume/README. Optional: add `DATABASE_URL` in the app's Secrets to read from a hosted PostgreSQL (Neon/Supabase free tier).
+Other options: any Docker host (Render, Fly.io, Railway) using the included `Dockerfile`.
+
 ## Pipeline behaviour
 - **Cleaning rules** (`clean.py`): parse 3 date formats; strip currency symbols; dedupe by `order_id` keeping the most complete row; fill missing prices from the product master;
   missing store → `Unknown`; drop rows with missing/≤0 quantity or unknown product; normalise category text.

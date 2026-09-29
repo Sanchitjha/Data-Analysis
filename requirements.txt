@@ -1,0 +1,9 @@
+# Runtime dependencies for the Streamlit dashboard (used by Streamlit Community Cloud).
+# Full dev/test setup: pip install -e ".[dashboard,dev]"
+streamlit>=1.40
+plotly>=5.18
+pandas>=2.0
+numpy
+sqlalchemy>=2.0
+psycopg2-binary
+requests
