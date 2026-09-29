@@ -52,7 +52,7 @@ cp .env.example .env                 # set DATABASE_URL etc.
 invsales all                         # generate -> clean -> validate -> load PostgreSQL
 streamlit run app/streamlit_app.py   # falls back to data/clean CSVs if PostgreSQL is unreachable
 invsales alerts                      # dry run;  invsales alerts --send  to post to Slack / email
-pytest                               # the DB integration tests auto-skip if PostgreSQL is not reachable
+pytest                               # DB integration tests run only if TEST_DATABASE_URL points at a scratch database (they drop tables!)
 ```
 `invsales kaggle [--train-csv path] [--items N]` then `invsales etl` switches the source to Kaggle data.
 Compose uses development credentials (`inventory/inventory`); set `POSTGRES_PASSWORD` for anything shared.

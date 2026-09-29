@@ -1,5 +1,8 @@
-"""Loads the pipeline output into a real PostgreSQL and checks SQL views == pandas KPIs.
-Skipped automatically when no database is reachable (set DATABASE_URL to enable)."""
+"""Loads pipeline output into a real PostgreSQL and checks SQL views == pandas KPIs.
+These tests DROP and recreate the tables, so they only run against TEST_DATABASE_URL (never DATABASE_URL);
+skipped when it is unset or unreachable."""
+import os
+
 import pandas as pd
 import pytest
 from sqlalchemy import text
@@ -13,7 +16,10 @@ from invsales.simulate import generate_raw
 
 @pytest.fixture(scope="module")
 def engine_and_data():
-    settings = Settings()
+    url = os.getenv("TEST_DATABASE_URL")
+    if not url:
+        pytest.skip("TEST_DATABASE_URL not set")
+    settings = Settings(database_url=url)
     engine = get_engine(settings)
     try:
         engine.connect().close()
@@ -23,20 +29,19 @@ def engine_and_data():
     sales, products, restocks, _ = clean_all(raw[0].astype(str).replace({"nan": None, "None": None}),
                                              raw[1].astype(str), raw[2].astype(str))
     load_tables(engine, settings, sales, products, restocks)
-    return engine, read_tables(engine)
+    return engine, read_tables(engine), settings
 
 
 def test_load_is_idempotent(engine_and_data):
-    engine, (sales, products, restocks) = engine_and_data
+    engine, (sales, products, restocks), settings = engine_and_data
     n = len(sales)
-    settings = Settings()
     load_tables(engine, settings, sales, products, restocks)
     with engine.connect() as c:
         assert c.execute(text("SELECT COUNT(*) FROM sales")).scalar_one() == n
 
 
 def test_kpi_summary_matches_pandas(engine_and_data):
-    engine, (sales, products, restocks) = engine_and_data
+    engine, (sales, products, restocks), _ = engine_and_data
     row = pd.read_sql("SELECT * FROM v_kpi_summary", engine).iloc[0]
     h = kpis.headline(sales, products)
     assert float(row.total_sales) == pytest.approx(h["total_sales"]) and int(row.low_stock_items) == h["low_stock_items"]
@@ -44,7 +49,7 @@ def test_kpi_summary_matches_pandas(engine_and_data):
 
 
 def test_turnover_and_alert_views_match_pandas(engine_and_data):
-    engine, (sales, products, restocks) = engine_and_data
+    engine, (sales, products, restocks), _ = engine_and_data
     sql = pd.read_sql("SELECT * FROM v_stock_turnover_classified", engine).set_index("product_id")
     py = kpis.stock_turnover(sales, products, restocks).set_index("product_id")
     assert (sql.stock_turnover.astype(float) - py.stock_turnover).abs().max() < 0.011
@@ -55,7 +60,7 @@ def test_turnover_and_alert_views_match_pandas(engine_and_data):
 
 
 def test_monthly_view_matches_pandas(engine_and_data):
-    engine, (sales, _, _) = engine_and_data
+    engine, (sales, _, _), _ = engine_and_data
     sql = pd.read_sql("SELECT * FROM v_monthly_sales ORDER BY month", engine)
     py = kpis.monthly_sales(sales)
     assert list(sql.revenue.astype(float).round(2)) == list(py.revenue.round(2))
