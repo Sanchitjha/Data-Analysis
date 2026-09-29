@@ -120,6 +120,14 @@ def create_app(tables: dict | None = None, settings: Settings | None = None) -> 
             a = a[a.severity == severity]
         return {"count": len(a), "items": records(a.head(limit))}
 
+    @app.get("/inventory/health", tags=["inventory"])
+    def health_summary(delay_days: float = Query(0, ge=0, le=90)):
+        """Cash and risk summary: stock value, excess, dead stock, items likely to stock out. `delay_days`: what-if supplier delay."""
+        t, s = store.t, store.settings
+        repl = store.repl if not delay_days else analytics.replenishment(
+            t["sales"], t["inventory"], t["products"], t["warehouses"], s.service_level_z, s.ordering_cost, s.holding_rate, delay_days)
+        return {"delay_days": delay_days, **analytics.inventory_health(t["sales"], repl)}
+
     @app.get("/replenishment", tags=["inventory"])
     def replenishment(warehouse_id: str | None = None, only_due: bool = True, limit: int = Query(100, ge=1, le=5000)):
         r = _wh(store.repl, warehouse_id)

@@ -8,8 +8,9 @@ class DataQualityError(Exception):
     pass
 
 
-def validate(t: dict[str, pd.DataFrame]) -> list[str]:
-    """Return a list of failed-check messages (empty = all good). `t` holds the 5 cleaned tables."""
+def validate(t: dict[str, pd.DataFrame], strict: bool = True) -> list[str]:
+    """Return a list of failed-check messages (empty = all good). `t` holds the 5 cleaned tables.
+    strict=False (imported customer data) allows empty inventory/restocks tables."""
     sales, products, inventory = t["sales"], t["products"], t["inventory"]
     restocks, warehouses = t["restocks"], t["warehouses"]
     problems: list[str] = []
@@ -18,7 +19,8 @@ def validate(t: dict[str, pd.DataFrame]) -> list[str]:
         if not ok:
             problems.append(msg)
 
-    check(all(len(x) > 0 for x in t.values()), "empty table")
+    required = t.values() if strict else (t["sales"], t["products"], t["warehouses"])
+    check(all(len(x) > 0 for x in required), "empty table")
     check(warehouses.warehouse_id.is_unique, "warehouses.warehouse_id not unique")
     check(products.product_id.is_unique, "products.product_id not unique")
     check(sales.order_id.is_unique, "sales.order_id not unique")
@@ -40,7 +42,7 @@ def validate(t: dict[str, pd.DataFrame]) -> list[str]:
     return problems
 
 
-def assert_valid(t: dict[str, pd.DataFrame]) -> None:
-    problems = validate(t)
+def assert_valid(t: dict[str, pd.DataFrame], strict: bool = True) -> None:
+    problems = validate(t, strict)
     if problems:
         raise DataQualityError("; ".join(problems))

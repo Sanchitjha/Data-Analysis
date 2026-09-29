@@ -69,3 +69,11 @@ def test_api_key_enforced_when_configured(tables, monkeypatch):
     assert c.get("/health").status_code == 401
     assert c.get("/health", headers={"X-API-Key": "wrong"}).status_code == 401
     assert c.get("/health", headers={"X-API-Key": "secret"}).status_code == 200
+
+
+def test_inventory_health_and_what_if(client):
+    base = client.get("/inventory/health").json()
+    slow = client.get("/inventory/health", params={"delay_days": 14}).json()
+    assert base["delay_days"] == 0 and base["stock_value"] > 0 and 0 <= base["excess_pct"] <= 100
+    assert slow["at_risk_items"] >= base["at_risk_items"] and slow["suggested_po_value"] >= base["suggested_po_value"]
+    assert client.get("/inventory/health", params={"delay_days": -1}).status_code == 422

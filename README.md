@@ -5,29 +5,37 @@
 
 **Live demo:** https://data-analysis-05.streamlit.app/ (simulated data; free-tier apps sleep when idle, the first load may take ~30 s)
 
-A multi-warehouse inventory and sales analytics platform: a tested ETL pipeline loads PostgreSQL (scales to 1.5M+ order lines),
-SQL views, a Streamlit dashboard, a FastAPI service and a Power BI model sit on top, and analytics go beyond reporting to
-**decisions**: what to reorder and how much (safety stock / reorder point / EOQ), demand forecasts, ABC-XYZ segmentation and
-warehouse-to-warehouse transfer suggestions. Reorder alerts run on a schedule via Slack/email.
+An **inventory decision-support tool** you can point at your own data. Export sales (and optionally stock and a product list) from Excel,
+Tally, Zoho, a POS or an ERP, upload it, and get: **what to order and how much** (safety stock / reorder point / EOQ), **what may stock out**
+(probability during the supplier lead time), **cash tied up** in excess and dead stock, **transfers** between locations, demand forecasts
+with a backtest, ABC-XYZ segmentation and a **weekly Excel action pack**, plus **what-if** analysis for slower suppliers or higher service
+levels. Under the hood: a tested ETL pipeline, PostgreSQL (1.5M+ order lines), SQL views, a REST API and a Power BI model.
+
+New here? Read the [user guide](docs/USER_GUIDE.md): what files you need, what each number means, and the limits you should know before acting on it.
 
 **Stack:** Python (Pandas, NumPy, SQLAlchemy) · PostgreSQL · FastAPI · Streamlit/Plotly · Power BI (DAX/TMDL) · Excel · Docker · GitHub Actions
 
 ![overview](screenshots/app_overview.png)
+![reorder plan](screenshots/app_reorder_plan.png)
 
 ## What it does
 | Area | Details |
 |---|---|
+| **Bring your own data** | upload CSV/XLSX (or `invsales import`): auto column mapping (SKU/Item Code/Qty Sold/Branch...), messy dates (DD/MM vs MM/DD, Excel serials), currency text (`Rs. 1,200`), returns excluded, and an **import report** listing every drop and assumption. Only sales are required; missing stock/cost/lead time get documented defaults |
 | **Data pipeline** | raw CSV -> clean (dedupe, 3 date formats, `$` prices, missing values) -> quality gate (20+ checks) -> parquet/CSV -> PostgreSQL via bulk `COPY` in one transaction (idempotent) |
 | **Scale** | `demo` preset: 60 SKUs x 3 warehouses (103k rows, committed, used by the live demo). `large`: 300 SKUs x 6 warehouses x 3 years = **1.47M order lines**, full ETL in 59 s. See [docs/BENCHMARKS.md](docs/BENCHMARKS.md) |
 | **KPIs / SQL** | sales, stock, turnover, days of inventory, fast/slow quartiles (`NTILE`), MoM growth, margin, warehouse comparison: reporting views in `sql/04_views.sql`, cross-checked against pandas in tests |
 | **Replenishment** | per warehouse x product: safety stock `z*sigma*sqrt(L)`, reorder point, EOQ, suggested order qty and cost, gap vs current reorder level |
 | **Forecasting** | 30-day demand per product (level x weekday profile x yoy seasonality, pooled per category) with a holdout **backtest vs a naive baseline** |
 | **ABC-XYZ** | value class (cumulative revenue) x demand variability (CV of monthly rate) |
+| **Risk and cash** | stockout probability during lead time, excess stock value, dead stock (no sales in 90 days), median days of cover |
+| **What-if** | slower suppliers (+N days) and service level 80-99.5%: purchase need and at-risk items recomputed (dashboard tab, sidebar, `/inventory/health?delay_days=`) |
+| **Action pack** | one-click Excel: orders to place, stockout risk, transfers, excess stock, ABC-XYZ, and the assumptions ([sample](docs/sample_action_pack.xlsx)) |
 | **Transfers** | greedy rebalancing: surplus (> ROP + EOQ) to warehouses short on the same product, before buying |
-| **Dashboard** | 7 tabs (overview, fast/slow, ABC-XYZ, forecast, replenishment, transfers, alerts), filters by warehouse/category/date, CSV downloads |
-| **REST API** | `/kpis /alerts /replenishment /forecast/{id} /abc /transfers /products/{id}` + Swagger at `/docs`, optional `X-API-Key` |
+| **Dashboard** | 9 tabs (overview, ABC-XYZ, forecast, reorder plan, cash & risk, what-if, transfers, fast/slow, alerts), filters by location/category/date, CSV/Excel downloads; works without a stock file (sales analytics only) |
+| **REST API** | `/kpis /alerts /replenishment /inventory/health /forecast/{id} /abc /transfers /products/{id}` + Swagger at `/docs`, optional `X-API-Key` |
 | **Automation** | daily GitHub Actions job: ETL + alerts (Slack / SMTP), hosted-PostgreSQL ready (Neon/Supabase via `DATABASE_URL`) |
-| **Quality** | 50 tests (45 without a test database; unit, API, **SQL-vs-pandas on real PostgreSQL**), ruff, CI incl. a 1.5M-row scale job, Docker build |
+| **Quality** | 79 tests (74 without a test database; unit, importer edge cases, API, CLI, **SQL-vs-pandas on real PostgreSQL**), ruff, CI incl. a 1.5M-row scale job, Docker build |
 
 ## Architecture
 ```
@@ -40,14 +48,15 @@ data/<preset>/raw/*.csv ─► clean ─► validate ─► data/<preset>/clean/
 ```
 | Path | Purpose |
 |---|---|
-| `src/invsales/` | `simulate`, `sources`, `clean`, `validate`, `db`, `repository`, `kpis`, `analytics`, `alerts`, `api`, `pipeline`, `cli` |
+| `src/invsales/` | `importer` (bring your own data), `simulate`, `sources`, `clean`, `validate`, `db`, `repository`, `kpis`, `analytics`, `reports`, `alerts`, `api`, `pipeline`, `cli` |
 | `sql/` | `01_schema` (5 tables, PK/FK/checks, 4 indexes) · `03_analysis_queries` · `04_views` (reporting views) |
 | `app/streamlit_app.py` | dashboard |
 | `powerbi/` | `Inventory.pbip` (generated TMDL model), `measures.dax`, `BUILD_GUIDE.md`, model CSVs |
 | `excel/` | workbook: SUMIFS summaries, warehouse chart, inventory flags, Python replenishment sheet |
 | `notebooks/01_exploration.ipynb` | executed walk-through of the results |
 | `scripts/` | benchmark, Excel/Power BI exports, PBIP + notebook generators |
-| `docs/` | benchmarks |
+| `docs/` | `USER_GUIDE.md`, `BENCHMARKS.md`, sample action pack |
+| `templates/` | sample input files (`invsales templates`) |
 
 ## About the data (please read)
 - **Default: synthetic.** `invsales generate` simulates warehouses x products x days of demand (seasonality, trend, weekends, warehouse size), a
@@ -60,6 +69,7 @@ data/<preset>/raw/*.csv ─► clean ─► validate ─► data/<preset>/clean/
 - No public dataset ships true stock levels for a specific business; say the inventory layer is simulated when discussing the project.
 
 ## Quick start
+**Use your own data:** open the dashboard, choose *My data (upload)* (or `invsales import --sales sales.xlsx --stock stock.csv`). For confidential data, run it yourself: `docker compose up`.
 ```bash
 # Docker: PostgreSQL + ETL + dashboard (:8501) + API (:8000)
 docker compose up --build            # PRESET=large docker compose up --build  for the 1.5M-row dataset
@@ -106,5 +116,5 @@ Compose uses development credentials (`inventory/inventory`); set `POSTGRES_PASS
   table to add one. Formulas were not recalculated in Excel by the generator; check the totals on first open.
 
 ## Limitations
-Single-machine benchmarks; full-refresh loads (no incremental/CDC); the forecast is a baseline; replenishment assumes constant lead times and ignores
+See [docs/USER_GUIDE.md](docs/USER_GUIDE.md#5-known-limits-please-read-before-acting-on-numbers) for what the model does not know (promotions, lost sales during stockouts, minimum order quantities, ...). Single-machine benchmarks; full-refresh loads (no incremental/CDC); the forecast is a baseline; replenishment assumes constant lead times and ignores
 minimum order quantities and budget constraints; `docker-compose.yml` has not been run end to end (CI builds the image and runs the pipeline against PostgreSQL).

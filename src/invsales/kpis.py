@@ -22,13 +22,15 @@ def monthly_sales(sales: pd.DataFrame) -> pd.DataFrame:
 
 
 def _ntile_class(turnover: pd.Series) -> pd.Series:
-    """Same buckets as SQL NTILE(4) OVER (ORDER BY turnover DESC): 1 -> Fast, 4 -> Slow, else Medium."""
-    base, extra = len(turnover) // 4, len(turnover) % 4
+    """Same buckets as SQL NTILE(4) OVER (ORDER BY turnover DESC): 1 -> Fast, 4 -> Slow, else Medium.
+    Rows without a turnover (no stock to average) are labelled 'n/a' and do not take part in the quartiles."""
+    valid = turnover.dropna()
+    base, extra = len(valid) // 4, len(valid) % 4
     sizes = [base + (1 if i < extra else 0) for i in range(4)]
     bucket = np.repeat([1, 2, 3, 4], sizes)
-    order = turnover.rank(method="first", ascending=False).astype(int).to_numpy() - 1
-    return pd.Series(np.where(bucket[order] == 1, "Fast", np.where(bucket[order] == 4, "Slow", "Medium")),
-                     index=turnover.index)
+    order = valid.rank(method="first", ascending=False).astype(int).to_numpy() - 1
+    cls = pd.Series(np.where(bucket[order] == 1, "Fast", np.where(bucket[order] == 4, "Slow", "Medium")), index=valid.index)
+    return cls.reindex(turnover.index).fillna("n/a")
 
 
 def stock_turnover(sales: pd.DataFrame, inventory: pd.DataFrame, restocks: pd.DataFrame, products: pd.DataFrame,
@@ -37,7 +39,10 @@ def stock_turnover(sales: pd.DataFrame, inventory: pd.DataFrame, restocks: pd.Da
     Opening stock = first restock row per warehouse x product (initial stock-in).
     level='product' rolls the warehouses up (stock and sales summed per product)."""
     keys = ["warehouse_id", "product_id"]
-    opening = restocks.sort_values("restock_date").groupby(keys).quantity.first().rename("opening_stock")
+    if restocks.empty:                     # imported data without receipts history: approximate with the current stock
+        opening = inventory.set_index(keys).current_stock.rename("opening_stock")
+    else:
+        opening = restocks.sort_values("restock_date").groupby(keys).quantity.first().rename("opening_stock")
     agg = sales.groupby(keys).agg(units_sold=("quantity", "sum"), revenue=("revenue", "sum"),
                                   first=("order_date", "min"), last=("order_date", "max"))
     k = inventory.set_index(keys).join(agg).join(opening).reset_index()

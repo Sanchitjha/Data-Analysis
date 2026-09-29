@@ -10,7 +10,7 @@ requires-python = ">=3.10"
 dependencies = ["pandas>=2.0", "numpy", "sqlalchemy>=2.0", "psycopg2-binary", "pyarrow", "requests"]
 
 [project.optional-dependencies]
-dashboard = ["streamlit>=1.30", "plotly>=5.18"]
+dashboard = ["streamlit>=1.30", "plotly>=5.18", "openpyxl"]
 api = ["fastapi>=0.110", "uvicorn>=0.29"]
 kaggle = ["kaggle"]
 dev = ["pytest", "pytest-cov", "ruff", "httpx", "openpyxl", "nbformat", "nbconvert", "ipykernel"]

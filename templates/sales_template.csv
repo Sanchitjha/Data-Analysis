@@ -1,0 +1,5 @@
+date,sku,quantity,location,unit_price
+2025-01-02,SKU-1001,12,Pune,120.00
+2025-01-02,SKU-1002,3,Pune,80.00
+2025-01-03,SKU-1001,9,Nagpur,120.00
+2025-01-03,SKU-1003,1,Nagpur,450.00

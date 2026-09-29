@@ -1,0 +1,4 @@
+sku,product_name,category,unit_cost,unit_price,lead_time_days
+SKU-1001,Basmati Rice 5kg,Staples,95,120,7
+SKU-1002,Sunflower Oil 1L,Staples,60,80,5
+SKU-1003,Hand Blender,Appliances,300,450,14

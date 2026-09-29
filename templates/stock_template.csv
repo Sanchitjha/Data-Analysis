@@ -1,0 +1,5 @@
+sku,location,stock_on_hand,reorder_level
+SKU-1001,Pune,140,60
+SKU-1002,Pune,25,
+SKU-1001,Nagpur,20,60
+SKU-1003,Nagpur,4,

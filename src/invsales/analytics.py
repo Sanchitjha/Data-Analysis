@@ -2,6 +2,8 @@
 replenishment, and warehouse-to-warehouse transfer suggestions."""
 from __future__ import annotations
 
+import math
+
 import numpy as np
 import pandas as pd
 
@@ -122,19 +124,28 @@ def demand_stats(sales: pd.DataFrame) -> pd.DataFrame:
     return g[["mean_daily", "std_daily"]].reset_index()
 
 
+def _norm_cdf(x: np.ndarray) -> np.ndarray:
+    return 0.5 * (1.0 + np.array([math.erf(v / math.sqrt(2)) for v in np.asarray(x, dtype=float).ravel()]).reshape(np.shape(x)))
+
+
 def replenishment(sales: pd.DataFrame, inventory: pd.DataFrame, products: pd.DataFrame, warehouses: pd.DataFrame,
-                  z: float = 1.65, ordering_cost: float = 50.0, holding_rate: float = 0.20) -> pd.DataFrame:
+                  z: float = 1.65, ordering_cost: float = 50.0, holding_rate: float = 0.20,
+                  lead_time_extra_days: float = 0.0) -> pd.DataFrame:
     """Recommended policy per warehouse x product.
 
     safety stock  SS  = z * sigma_daily * sqrt(lead_time)
     reorder point ROP = mean_daily * lead_time + SS
     EOQ           = sqrt(2 * annual_demand * ordering_cost / (holding_rate * unit_cost))
     suggested order (when stock <= ROP) = ROP + EOQ - stock   (order-up-to level = ROP + EOQ)
+    stockout risk = P(demand during lead time > stock on hand), demand ~ Normal(mean*L, sigma*sqrt(L))
+    excess = stock above the order-up-to level (cash that a well-run policy would not hold)
+    `lead_time_extra_days` is a what-if: every supplier is that many days slower.
     """
     r = inventory.merge(demand_stats(sales), on=["warehouse_id", "product_id"], how="left")
     r = r.merge(products[["product_id", "product_name", "category", "unit_cost", "lead_time_days"]], on="product_id")
     r = r.merge(warehouses[["warehouse_id", "warehouse_name"]], on="warehouse_id")
     r[["mean_daily", "std_daily"]] = r[["mean_daily", "std_daily"]].fillna(0.0)
+    r["lead_time_days"] = r.lead_time_days + lead_time_extra_days
     r["safety_stock"] = np.ceil(z * r.std_daily * np.sqrt(r.lead_time_days))
     r["reorder_point"] = np.ceil(r.mean_daily * r.lead_time_days + r.safety_stock)
     holding = (holding_rate * r.unit_cost).where(lambda s: s > 0)
@@ -143,11 +154,21 @@ def replenishment(sales: pd.DataFrame, inventory: pd.DataFrame, products: pd.Dat
     r["below_rop"] = r.current_stock <= r.reorder_point
     r["suggested_order_qty"] = np.where(r.below_rop, (r.order_up_to - r.current_stock).clip(lower=0), 0).astype(int)
     r["suggested_order_cost"] = (r.suggested_order_qty * r.unit_cost).round(2)
+    lt_mean, lt_sd = r.mean_daily * r.lead_time_days, r.std_daily * np.sqrt(r.lead_time_days)
+    z_stock = (r.current_stock - lt_mean) / lt_sd.where(lt_sd > 0)
+    risk = 1.0 - _norm_cdf(z_stock.fillna(0).to_numpy())
+    risk = np.where(lt_sd > 0, risk, (r.current_stock < lt_mean).astype(float))
+    risk = np.where((r.current_stock <= 0) & (r.mean_daily > 0), 1.0, risk)          # already out of stock and it sells
+    r["stockout_risk_pct"] = np.round(100 * risk, 1)
+    r["excess_units"] = (r.current_stock - r.order_up_to).clip(lower=0).astype(int)
+    r["excess_value"] = (r.excess_units * r.unit_cost).round(2)
+    r["stock_value"] = (r.current_stock * r.unit_cost).round(2)
     r["policy_gap"] = r.reorder_point - r.reorder_level          # >0: current reorder level is too low
     r["days_of_cover"] = (r.current_stock / r.mean_daily.where(r.mean_daily > 0)).round(1)
     cols = ["warehouse_id", "warehouse_name", "product_id", "product_name", "category", "current_stock", "reorder_level",
             "mean_daily", "std_daily", "lead_time_days", "safety_stock", "reorder_point", "eoq", "order_up_to",
-            "below_rop", "suggested_order_qty", "suggested_order_cost", "policy_gap", "days_of_cover"]
+            "below_rop", "suggested_order_qty", "suggested_order_cost", "stockout_risk_pct", "excess_units", "excess_value",
+            "stock_value", "policy_gap", "days_of_cover"]
     return r[cols].round({"mean_daily": 3, "std_daily": 3})
 
 
@@ -176,3 +197,23 @@ def transfer_suggestions(repl: pd.DataFrame, products: pd.DataFrame) -> pd.DataF
     out = out.merge(products[["product_id", "product_name", "unit_cost"]], on="product_id")
     out["value_at_cost"] = (out.quantity * out.unit_cost).round(2)
     return out.drop(columns="unit_cost").sort_values("value_at_cost", ascending=False).reset_index(drop=True)
+
+
+def inventory_health(sales: pd.DataFrame, repl: pd.DataFrame, dead_days: int = 90, risk_threshold: float = 50.0) -> dict:
+    """Cash and risk summary: what is tied up unnecessarily, what is not moving, what is likely to stock out."""
+    end = sales.order_date.max()
+    recent = sales[sales.order_date > end - pd.Timedelta(days=dead_days)]
+    active = set(zip(recent.warehouse_id, recent.product_id, strict=True))
+    key = list(zip(repl.warehouse_id, repl.product_id, strict=True))
+    not_active = np.array([k not in active for k in key], dtype=bool)
+    dead = repl[not_active & (repl.current_stock > 0).to_numpy()]
+    total = float(repl.stock_value.sum())
+    return {
+        "stock_value": round(total, 2),
+        "excess_value": round(float(repl.excess_value.sum()), 2),
+        "excess_pct": round(100 * float(repl.excess_value.sum()) / total, 1) if total else 0.0,
+        "dead_stock_items": int(len(dead)), "dead_stock_value": round(float(dead.stock_value.sum()), 2),
+        "at_risk_items": int((repl.stockout_risk_pct >= risk_threshold).sum()),
+        "median_days_of_cover": float(repl.days_of_cover.median()) if repl.days_of_cover.notna().any() else None,
+        "suggested_po_value": round(float(repl.suggested_order_cost.sum()), 2),
+    }

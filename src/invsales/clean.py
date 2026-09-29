@@ -7,8 +7,10 @@ DATE_FORMATS = ("%Y-%m-%d", "%d/%m/%Y", "%d-%b-%Y")
 
 
 def to_number(s: pd.Series) -> pd.Series:
-    """'$12.50' / '1,200' / 12.5 -> float (unparseable -> NaN)."""
-    return pd.to_numeric(s.astype("string").str.replace(r"[$,\s]", "", regex=True), errors="coerce")
+    """'$12.50' / 'Rs. 1,200' / '₹1,200.5' / '12.5 USD' / 12.5 -> float: commas dropped, then the first number is taken
+    (unparseable -> NaN). Plain '1234.56' style numbers only: European '1.234,56' is not supported."""
+    txt = s.astype("string").str.replace(",", "", regex=False)
+    return pd.to_numeric(txt.str.extract(r"(-?\d+(?:\.\d+)?|-?\.\d+)")[0], errors="coerce")
 
 
 def parse_dates(s: pd.Series) -> pd.Series:
