@@ -5,12 +5,12 @@ import numpy as np
 import pandas as pd
 
 
-def headline(sales: pd.DataFrame, products: pd.DataFrame) -> dict:
+def headline(sales: pd.DataFrame, inventory: pd.DataFrame) -> dict:
     return {
         "total_sales": float(sales.revenue.sum()),
         "units_sold": int(sales.quantity.sum()),
-        "total_stock": int(products.current_stock.sum()),
-        "low_stock_items": int((products.current_stock <= products.reorder_level).sum()),
+        "total_stock": int(inventory.current_stock.sum()),
+        "low_stock_items": int((inventory.current_stock <= inventory.reorder_level).sum()),
     }
 
 
@@ -31,33 +31,46 @@ def _ntile_class(turnover: pd.Series) -> pd.Series:
                      index=turnover.index)
 
 
-def stock_turnover(sales: pd.DataFrame, products: pd.DataFrame, restocks: pd.DataFrame) -> pd.DataFrame:
+def stock_turnover(sales: pd.DataFrame, inventory: pd.DataFrame, restocks: pd.DataFrame, products: pd.DataFrame,
+                   level: str = "warehouse_product") -> pd.DataFrame:
     """turnover = units sold / average stock; average stock = (opening + current) / 2.
-    Opening stock = first restock row per product (initial stock-in)."""
-    opening = restocks.sort_values("restock_date").groupby("product_id").quantity.first().rename("opening_stock")
-    agg = sales.groupby("product_id").agg(units_sold=("quantity", "sum"), revenue=("revenue", "sum"),
-                                          first=("order_date", "min"), last=("order_date", "max"))
-    k = products.set_index("product_id").join(agg).join(opening)
+    Opening stock = first restock row per warehouse x product (initial stock-in).
+    level='product' rolls the warehouses up (stock and sales summed per product)."""
+    keys = ["warehouse_id", "product_id"]
+    opening = restocks.sort_values("restock_date").groupby(keys).quantity.first().rename("opening_stock")
+    agg = sales.groupby(keys).agg(units_sold=("quantity", "sum"), revenue=("revenue", "sum"),
+                                  first=("order_date", "min"), last=("order_date", "max"))
+    k = inventory.set_index(keys).join(agg).join(opening).reset_index()
     k["units_sold"] = k.units_sold.fillna(0).astype(int)
     k["revenue"] = k.revenue.fillna(0.0)
+    k["days_selling"] = (k["last"] - k["first"]).dt.days + 1
+    if level == "product":
+        k = k.groupby("product_id").agg(
+            current_stock=("current_stock", "sum"), reorder_level=("reorder_level", "sum"),
+            units_sold=("units_sold", "sum"), revenue=("revenue", "sum"), opening_stock=("opening_stock", "sum"),
+            days_selling=("days_selling", "max")).reset_index()
+    k = k.merge(products[["product_id", "product_name", "category"]], on="product_id")
     k["avg_stock"] = (k.opening_stock + k.current_stock) / 2
     k["stock_turnover"] = (k.units_sold / k.avg_stock.where(k.avg_stock > 0)).round(2)
-    days = ((k["last"] - k["first"]).dt.days + 1)
-    k["days_of_inventory"] = (days / k.stock_turnover.where(k.stock_turnover > 0)).round(0)
-    k = k.drop(columns=["first", "last"]).reset_index()
+    k["days_of_inventory"] = (k.days_selling / k.stock_turnover.where(k.stock_turnover > 0)).round(0)
     k["movement_class"] = _ntile_class(k.stock_turnover)
-    return k
+    return k.drop(columns=["first", "last"], errors="ignore")
 
 
-def reorder_alerts(sales: pd.DataFrame, products: pd.DataFrame, window_days: int = 90) -> pd.DataFrame:
-    """Products at/below reorder level, with days of stock left at the recent sales rate."""
+def reorder_alerts(sales: pd.DataFrame, inventory: pd.DataFrame, products: pd.DataFrame, warehouses: pd.DataFrame,
+                   window_days: int = 90) -> pd.DataFrame:
+    """Warehouse x product pairs at/below reorder level, with days of stock left at the recent sales rate."""
     end = sales.order_date.max()
     recent = sales[sales.order_date > end - pd.Timedelta(days=window_days)]
-    daily = (recent.groupby("product_id").quantity.sum() / window_days).rename("daily_demand")
-    a = products[products.current_stock <= products.reorder_level].merge(daily, on="product_id", how="left")
+    daily = (recent.groupby(["warehouse_id", "product_id"]).quantity.sum() / window_days).rename("daily_demand")
+    a = inventory[inventory.current_stock <= inventory.reorder_level]
+    a = a.merge(products[["product_id", "product_name", "category", "lead_time_days"]], on="product_id")
+    a = a.merge(warehouses[["warehouse_id", "warehouse_name"]], on="warehouse_id")
+    a = a.merge(daily, on=["warehouse_id", "product_id"], how="left")
     a["shortfall"] = a.reorder_level - a.current_stock
     a["days_of_stock_left"] = (a.current_stock / a.daily_demand.where(a.daily_demand > 0)).round(1)
-    a["severity"] = pd.cut(a.days_of_stock_left.fillna(9999), [-1, 0, 3, 9999], labels=["Stockout", "Critical", "Low"]).astype(str)
+    a["severity"] = pd.cut(a.days_of_stock_left.fillna(9999), [-1, 0, 3, 9999],
+                           labels=["Stockout", "Critical", "Low"]).astype(str)
     return a.sort_values(["days_of_stock_left", "shortfall"], ascending=[True, False]).reset_index(drop=True)
 
 
@@ -68,3 +81,11 @@ def category_summary(sales: pd.DataFrame, products: pd.DataFrame) -> pd.DataFram
     c["margin_pct"] = (100 * c.gross_profit / c.revenue).round(1)
     c["revenue_share_pct"] = (100 * c.revenue / c.revenue.sum()).round(1)
     return c.sort_values("revenue", ascending=False).reset_index(drop=True)
+
+
+def warehouse_summary(sales: pd.DataFrame, inventory: pd.DataFrame, warehouses: pd.DataFrame) -> pd.DataFrame:
+    s = sales.groupby("warehouse_id").agg(revenue=("revenue", "sum"), units=("quantity", "sum"))
+    i = inventory.assign(low=inventory.current_stock <= inventory.reorder_level).groupby("warehouse_id").agg(
+        total_stock=("current_stock", "sum"), skus=("product_id", "count"), low_stock_items=("low", "sum"))
+    w = warehouses.set_index("warehouse_id").join(s).join(i).fillna(0).reset_index()
+    return w.sort_values("revenue", ascending=False).reset_index(drop=True)

@@ -1,0 +1,17 @@
+{
+  "rows_in": 105064,
+  "unparseable_dates_dropped": 0,
+  "duplicates_removed": 1246,
+  "prices_filled_from_master": 1033,
+  "invalid_rows_dropped": 818,
+  "rows_out": 103000,
+  "seconds_clean": 1.0,
+  "rows": {
+    "warehouses": 3,
+    "products": 60,
+    "sales": 103000,
+    "inventory": 180,
+    "restocks": 1863
+  },
+  "seconds_load": 2.6
+}

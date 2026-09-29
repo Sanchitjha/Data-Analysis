@@ -18,3 +18,10 @@ src/invsales.egg-info/dependency_links.txt
 src/invsales.egg-info/entry_points.txt
 src/invsales.egg-info/requires.txt
 src/invsales.egg-info/top_level.txt
+tests/test_alerts.py
+tests/test_clean.py
+tests/test_db_integration.py
+tests/test_kaggle_adapter.py
+tests/test_kpis.py
+tests/test_simulate.py
+tests/test_validate.py

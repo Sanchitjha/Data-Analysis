@@ -8,26 +8,31 @@ class DataQualityError(Exception):
     pass
 
 
-def validate(sales: pd.DataFrame, products: pd.DataFrame, restocks: pd.DataFrame) -> list[str]:
-    """Return a list of failed-check messages (empty = all good)."""
+def validate(t: dict[str, pd.DataFrame]) -> list[str]:
+    """Return a list of failed-check messages (empty = all good). `t` holds the 5 cleaned tables."""
+    sales, products, inventory = t["sales"], t["products"], t["inventory"]
+    restocks, warehouses = t["restocks"], t["warehouses"]
     problems: list[str] = []
 
     def check(ok: bool, msg: str) -> None:
         if not ok:
             problems.append(msg)
 
-    check(len(sales) > 0 and len(products) > 0 and len(restocks) > 0, "empty table")
+    check(all(len(x) > 0 for x in t.values()), "empty table")
+    check(warehouses.warehouse_id.is_unique, "warehouses.warehouse_id not unique")
     check(products.product_id.is_unique, "products.product_id not unique")
     check(sales.order_id.is_unique, "sales.order_id not unique")
-    check(not sales.isna().any().any(), "nulls in sales")
-    check(not products.isna().any().any(), "nulls in products")
+    check(not inventory.duplicated(["warehouse_id", "product_id"]).any(), "inventory (warehouse, product) not unique")
+    for name in ("sales", "products", "inventory", "restocks", "warehouses"):
+        check(not t[name].isna().any().any(), f"nulls in {name}")
     check(bool((sales.quantity > 0).all()), "non-positive sales quantity")
     check(bool((sales.unit_price > 0).all()), "non-positive unit price")
     check(bool((products.unit_price > products.unit_cost).all()), "price <= cost for some product")
-    check(bool((products.current_stock >= 0).all()), "negative stock")
-    check(bool((products.reorder_level >= 0).all()), "negative reorder level")
-    check(bool(sales.product_id.isin(products.product_id).all()), "sales reference unknown products")
-    check(bool(restocks.product_id.isin(products.product_id).all()), "restocks reference unknown products")
+    check(bool((inventory.current_stock >= 0).all()), "negative stock")
+    check(bool((inventory.reorder_level >= 0).all()), "negative reorder level")
+    for name, df in (("sales", sales), ("inventory", inventory), ("restocks", restocks)):
+        check(bool(df.product_id.isin(products.product_id).all()), f"{name} reference unknown products")
+        check(bool(df.warehouse_id.isin(warehouses.warehouse_id).all()), f"{name} reference unknown warehouses")
     check(bool(((sales.quantity * sales.unit_price - sales.revenue).abs() < 0.011).all()), "revenue != quantity*price")
     if len(sales):
         check(sales.order_date.min() > pd.Timestamp("2000-01-01") and sales.order_date.max() < pd.Timestamp("2100-01-01"),
@@ -35,7 +40,7 @@ def validate(sales: pd.DataFrame, products: pd.DataFrame, restocks: pd.DataFrame
     return problems
 
 
-def assert_valid(sales, products, restocks) -> None:
-    problems = validate(sales, products, restocks)
+def assert_valid(t: dict[str, pd.DataFrame]) -> None:
+    problems = validate(t)
     if problems:
         raise DataQualityError("; ".join(problems))

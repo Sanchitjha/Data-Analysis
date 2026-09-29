@@ -8,18 +8,19 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from .simulate import generate_raw, simulate_inventory
+from .simulate import CATEGORIES, generate_raw, simulate_inventory
 
-RAW_FILES = ("raw_sales.csv", "raw_products.csv", "raw_restocks.csv")
-DEFAULT_KAGGLE_DATASET = "competitions/demand-forecasting-kernels-only"  # Store Item Demand Forecasting
+RAW_TABLES = ("warehouses", "products", "inventory", "restocks", "sales")
 
 
-def write_synthetic(raw_dir: Path, seed: int = 42) -> None:
+def write_raw(raw_dir: Path, frames: dict[str, pd.DataFrame]) -> None:
     raw_dir.mkdir(parents=True, exist_ok=True)
-    sales, products, restocks = generate_raw(seed)
-    sales.to_csv(raw_dir / "raw_sales.csv", index=False)
-    products.to_csv(raw_dir / "raw_products.csv", index=False)
-    restocks.to_csv(raw_dir / "raw_restocks.csv", index=False)
+    for name in RAW_TABLES:
+        frames[name].to_csv(raw_dir / f"raw_{name}.csv", index=False)
+
+
+def write_synthetic(raw_dir: Path, seed: int = 42, preset: str = "demo") -> None:
+    write_raw(raw_dir, generate_raw(seed, preset))
 
 
 def kaggle_download(target: Path, competition: str = "demand-forecasting-kernels-only") -> Path:
@@ -33,49 +34,45 @@ def kaggle_download(target: Path, competition: str = "demand-forecasting-kernels
     return target / "train.csv"
 
 
-def adapt_store_item_demand(train: pd.DataFrame, seed: int = 42, n_items: int | None = None):
+def adapt_store_item_demand(train: pd.DataFrame, seed: int = 42, n_items: int | None = None) -> dict[str, pd.DataFrame]:
     """Map Kaggle 'Store Item Demand Forecasting' (date, store, item, sales) to the raw schema.
 
-    Real: dates, stores, items, units sold. NOT in the dataset (derived, documented in README):
-    product names/categories/prices/costs/lead times and the whole inventory layer (stock,
-    reorder level, restocks) which come from `simulate_inventory` on the real daily demand.
+    Real: dates, stores (used as warehouses), items, units sold. NOT in the dataset (derived, documented in the
+    README): product names/categories/prices/costs/lead times and the whole inventory layer (stock, reorder level,
+    restocks), which come from `simulate_inventory` run on the real daily demand.
     """
     rng = np.random.default_rng(seed)
     df = train.rename(columns=str.lower).copy()
     df["date"] = pd.to_datetime(df["date"])
     if n_items:
         df = df[df["item"] <= n_items]
-    items = sorted(df["item"].unique())
-    cats = ["Beverages", "Snacks", "Household", "Personal Care", "Staples"]
+    items, stores = sorted(df["item"].unique()), sorted(df["store"].unique())
+    wh_ids = [f"S{int(s):02d}" for s in stores]
+    warehouses = pd.DataFrame({"warehouse_id": wh_ids, "warehouse_name": [f"Store {int(s)}" for s in stores],
+                               "region": "n/a"})
     catalog = pd.DataFrame({
-        "product_id": [f"I{int(i):03d}" for i in items],
-        "product_name": [f"Item {int(i):03d}" for i in items],
-        "category": [cats[int(i) % len(cats)] for i in items],
-    })
+        "product_id": [f"I{int(i):03d}" for i in items], "product_name": [f"Item {int(i):03d}" for i in items],
+        "category": [CATEGORIES[int(i) % len(CATEGORIES)] for i in items]})
     catalog["unit_cost"] = np.round(rng.uniform(2, 20, len(catalog)), 2)
     catalog["unit_price"] = np.round(catalog.unit_cost * rng.uniform(1.25, 1.6, len(catalog)), 2)
     catalog["lead_time_days"] = rng.integers(3, 15, len(catalog))
 
-    df["product_id"] = df["item"].map(lambda i: f"I{int(i):03d}")
-    demand = df.pivot_table(index="date", columns="product_id", values="sales", aggfunc="sum", fill_value=0)
-    demand = demand[catalog.product_id]
-    _, restocks, state = simulate_inventory(demand, catalog, rng, constrain=False)
+    days = pd.DatetimeIndex(sorted(df["date"].unique()))
+    demand = np.zeros((len(days), len(stores), len(items)), dtype=np.int32)
+    di = days.get_indexer(df["date"])
+    wi = pd.Index(stores).get_indexer(df["store"])
+    pi = pd.Index(items).get_indexer(df["item"])
+    demand[di, wi, pi] = df["sales"].to_numpy()
+    fulfilled, restocks, inventory = simulate_inventory(demand, days, wh_ids, catalog, rng, constrain=False)
 
-    sales = df[df["sales"] > 0][["date", "store", "product_id", "sales"]].rename(
-        columns={"date": "order_date", "sales": "quantity"})
-    sales["store"] = "Store " + sales["store"].astype(str)
-    sales = sales.merge(catalog[["product_id", "unit_price"]], on="product_id").sort_values(
-        ["order_date", "product_id", "store"]).reset_index(drop=True)
-    sales.insert(0, "order_id", [f"K{i:07d}" for i in range(1, len(sales) + 1)])
-    sales["order_date"] = sales.order_date.dt.strftime("%Y-%m-%d")
-    products = catalog.merge(state, on="product_id")
+    d, w, p = np.nonzero(fulfilled)
+    sales = pd.DataFrame({
+        "order_id": [f"K{i:07d}" for i in range(1, len(d) + 1)], "order_date": days[d].strftime("%Y-%m-%d"),
+        "warehouse_id": np.array(wh_ids)[w], "product_id": catalog.product_id.to_numpy()[p],
+        "quantity": fulfilled[d, w, p], "unit_price": catalog.unit_price.to_numpy()[p]})
     restocks["restock_date"] = restocks.restock_date.dt.strftime("%Y-%m-%d")
-    return sales, products, restocks
+    return {"warehouses": warehouses, "products": catalog, "inventory": inventory, "restocks": restocks, "sales": sales}
 
 
 def write_kaggle(raw_dir: Path, train_csv: Path, seed: int = 42, n_items: int | None = None) -> None:
-    raw_dir.mkdir(parents=True, exist_ok=True)
-    sales, products, restocks = adapt_store_item_demand(pd.read_csv(train_csv), seed, n_items)
-    sales.to_csv(raw_dir / "raw_sales.csv", index=False)
-    products.to_csv(raw_dir / "raw_products.csv", index=False)
-    restocks.to_csv(raw_dir / "raw_restocks.csv", index=False)
+    write_raw(raw_dir, adapt_store_item_demand(pd.read_csv(train_csv), seed, n_items))

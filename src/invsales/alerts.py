@@ -18,12 +18,12 @@ def format_message(alerts: pd.DataFrame, max_rows: int = 15) -> str:
     if alerts.empty:
         return "All products are above their reorder level."
     counts = alerts.severity.value_counts()
-    head = (f"{len(alerts)} product(s) need reordering "
+    head = (f"{len(alerts)} item(s) need reordering "
             f"(stockout: {counts.get('Stockout', 0)}, critical <=3d: {counts.get('Critical', 0)}, low: {counts.get('Low', 0)})")
     lines = [head, ""]
     for r in alerts.head(max_rows).itertuples():
         left = "n/a" if pd.isna(r.days_of_stock_left) else f"{r.days_of_stock_left:g}d left"
-        lines.append(f"{ICON.get(r.severity, '-')} {r.product_name} ({r.product_id}) stock {r.current_stock} "
+        lines.append(f"{ICON.get(r.severity, '-')} {r.product_name} @ {r.warehouse_name}: stock {r.current_stock} "
                      f"/ reorder at {r.reorder_level} - {left}, lead time {r.lead_time_days}d")
     if len(alerts) > max_rows:
         lines.append(f"... and {len(alerts) - max_rows} more")
@@ -61,7 +61,7 @@ def dispatch(alerts: pd.DataFrame, settings: Settings, send: bool = False) -> st
         send_slack(settings.slack_webhook_url, text)
         sent = True
     if settings.smtp_host:
-        send_email(settings, f"[Inventory] {len(alerts)} products need reordering", text)
+        send_email(settings, f"[Inventory] {len(alerts)} items need reordering", text)
         sent = True
     if not sent:
         log.warning("no alert channel configured (set SLACK_WEBHOOK_URL and/or SMTP_HOST)")

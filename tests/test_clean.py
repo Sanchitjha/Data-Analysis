@@ -18,32 +18,31 @@ def test_parse_dates_mixed_formats():
 
 def test_clean_products_normalises_category_and_price():
     raw = pd.DataFrame({"product_id": ["A", "A"], "product_name": [" X ", " X "], "category": [" snacks ", "SNACKS"],
-                        "unit_cost": ["1.0", "1.0"], "unit_price": ["$2.00", "$2.00"], "lead_time_days": ["3", "3"],
-                        "reorder_level": ["5", "5"], "current_stock": ["9", "9"]})
+                        "unit_cost": ["1.0", "1.0"], "unit_price": ["$2.00", "$2.00"], "lead_time_days": ["3", "3"]})
     p = clean_products(raw)
     assert len(p) == 1 and p.category[0] == "Snacks" and p.unit_price[0] == 2.0 and p.product_name[0] == "X"
 
 
 def _raw_sales(**over):
-    base = {"order_id": ["1", "2", "3", "3", "4", "5"], "order_date": ["2025-01-01"] * 6,
-            "product_id": ["A", "A", "A", "A", "A", "Z"], "quantity": ["1", "2", "3", np.nan, "4", "1"],
-            "unit_price": ["$2.00", None, "$2.00", "$2.00", "$2.00", "$2.00"], "store": ["N", "N", "N", None, None, "N"]}
+    base = {"order_id": ["1", "2", "3", "3", "4", "5", "6"], "order_date": ["2025-01-01"] * 7,
+            "warehouse_id": ["W1", "W1", "W1", "W1", "W1", "W1", None],
+            "product_id": ["A", "A", "A", "A", "A", "Z", "A"], "quantity": ["1", "2", "3", np.nan, "4", "1", "1"],
+            "unit_price": ["$2.00", None, "$2.00", "$2.00", "$2.00", "$2.00", "$2.00"]}
     base.update(over)
     return pd.DataFrame(base)
 
 
-def test_clean_sales_rules(products):
-    s, rep = clean_sales(_raw_sales(), products)
+def test_clean_sales_rules(products, warehouses):
+    s, rep = clean_sales(_raw_sales(), products, warehouses)
     assert rep["duplicates_removed"] == 1
     assert rep["prices_filled_from_master"] == 1
-    assert rep["invalid_rows_dropped"] == 1            # order 5: unknown product Z
+    assert rep["invalid_rows_dropped"] == 2            # order 5: unknown product Z; order 6: missing warehouse
     assert s.order_id.is_unique and len(s) == 4
     assert s.loc[s.order_id == "2", "unit_price"].iloc[0] == 2.0                 # filled from product master
     assert s.loc[s.order_id == "3", "quantity"].iloc[0] == 3                     # kept the complete duplicate
-    assert s.loc[s.order_id == "4", "store"].iloc[0] == "Unknown"
     assert (s.revenue == s.quantity * s.unit_price).all()
 
 
-def test_clean_sales_drops_zero_and_missing_quantity(products):
-    s, _ = clean_sales(_raw_sales(quantity=["0", None, "1", "1", "1", "1"]), products)
+def test_clean_sales_drops_zero_and_missing_quantity(products, warehouses):
+    s, _ = clean_sales(_raw_sales(quantity=["0", None, "1", "1", "1", "1", "1"]), products, warehouses)
     assert set(s.order_id) == {"3", "4"}

@@ -1,8 +1,0 @@
-{
-  "rows_in": 63053,
-  "unparseable_dates_dropped": 0,
-  "duplicates_removed": 748,
-  "prices_filled_from_master": 621,
-  "invalid_rows_dropped": 367,
-  "rows_out": 61938
-}

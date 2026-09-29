@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+import os
 import sys
 
 from . import sources
@@ -15,8 +16,9 @@ from .repository import load_data
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="invsales")
+    ap.add_argument("--preset", choices=["demo", "large"], help="dataset size (overrides PRESET env)")
     sub = ap.add_subparsers(dest="cmd", required=True)
-    sub.add_parser("generate", help="write synthetic raw CSVs to data/raw")
+    sub.add_parser("generate", help="write synthetic raw CSVs (preset: PRESET env, demo|large)")
     k = sub.add_parser("kaggle", help="download the Kaggle Store-Item-Demand data and map it to the raw schema")
     k.add_argument("--train-csv", help="use an already-downloaded train.csv instead of calling Kaggle")
     k.add_argument("--items", type=int, help="only the first N items (faster)")
@@ -29,9 +31,11 @@ def main(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+    if args.preset:
+        os.environ["PRESET"] = args.preset
     s = get_settings()
     if args.cmd in ("generate", "all"):
-        sources.write_synthetic(s.raw_dir, s.seed)
+        sources.write_synthetic(s.raw_dir, s.seed, s.preset)
     if args.cmd == "kaggle":
         from pathlib import Path
         train = Path(args.train_csv) if args.train_csv else sources.kaggle_download(s.data_dir / "kaggle")
@@ -39,9 +43,10 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd in ("etl", "all"):
         run_etl(s, load_db=not args.no_db)
     if args.cmd == "alerts":
-        sales, products, _, src = load_data(s)
+        tables, src = load_data(s)
         logging.getLogger(__name__).info("data source: %s", src)
-        print(dispatch(reorder_alerts(sales, products), s, send=args.send))
+        print(dispatch(reorder_alerts(tables["sales"], tables["inventory"], tables["products"], tables["warehouses"]), s,
+                       send=args.send))
     return 0
 
 
