@@ -1,0 +1,71 @@
+// =====================================================================
+// DAX for "Inventory & Sales Analytics Dashboard"
+// Model: dim_products (1) --> (*) fact_sales      via product_id
+//        dim_products (1) --> (*) fact_restocks   via product_id
+//        dim_date     (1) --> (*) fact_sales      via order_date
+// =====================================================================
+
+// ---- Calculated table: date dimension (Modeling > New table) ----------
+dim_date =
+ADDCOLUMNS (
+    CALENDAR ( DATE ( 2024, 1, 1 ), DATE ( 2025, 12, 31 ) ),
+    "Year", YEAR ( [Date] ),
+    "Month No", MONTH ( [Date] ),
+    "Month", FORMAT ( [Date], "MMM yyyy" ),
+    "Month Sort", YEAR ( [Date] ) * 100 + MONTH ( [Date] )
+)
+// then: Month -> Sort by column -> Month Sort ; mark as date table on [Date]
+
+// ---- Core sales measures ------------------------------------------------
+Total Sales = SUM ( fact_sales[revenue] )
+
+Units Sold = SUM ( fact_sales[quantity] )
+
+Gross Profit =
+SUMX ( fact_sales, fact_sales[revenue] - fact_sales[quantity] * RELATED ( dim_products[unit_cost] ) )
+
+Gross Margin % = DIVIDE ( [Gross Profit], [Total Sales] )
+
+Sales LY = CALCULATE ( [Total Sales], SAMEPERIODLASTYEAR ( dim_date[Date] ) )
+
+Sales YoY % = DIVIDE ( [Total Sales] - [Sales LY], [Sales LY] )
+
+// ---- Inventory measures ---------------------------------------------------
+// current_stock in dim_products is the closing stock snapshot (last day of data)
+Total Stock = SUM ( dim_products[current_stock] )
+
+Low-Stock Items =
+COUNTROWS ( FILTER ( dim_products, dim_products[current_stock] <= dim_products[reorder_level] ) )
+
+Opening Stock =
+CALCULATE (
+    SUM ( fact_restocks[quantity] ),
+    fact_restocks[restock_date] = MIN ( fact_restocks[restock_date] )   // first stock-in per product
+)
+
+Average Stock = DIVIDE ( [Opening Stock] + [Total Stock], 2 )
+
+// Stock turnover = units sold / average stock (evaluated per product in a table/bar visual)
+Stock Turnover = DIVIDE ( [Units Sold], [Average Stock] )
+
+Days of Inventory = DIVIDE ( 730, [Stock Turnover] )     // 730 = days in the 2-year window
+
+// ---- Reorder alert ---------------------------------------------------------
+Reorder Status =
+IF ( SELECTEDVALUE ( dim_products[current_stock] ) <= SELECTEDVALUE ( dim_products[reorder_level] ), "REORDER", "OK" )
+
+Shortfall =
+MAX ( 0, SELECTEDVALUE ( dim_products[reorder_level] ) - SELECTEDVALUE ( dim_products[current_stock] ) )
+
+// Use as a "Reorder alert" table visual filter: Reorder Status = "REORDER".
+// Conditional formatting (Cell elements > Background color > Rules): stock = 0 -> red, stock <= reorder level -> orange.
+
+// ---- Fast / slow classification ----------------------------------------------
+Movement Class =
+VAR t = [Stock Turnover]
+VAR p75 = PERCENTILEX.INC ( ALL ( dim_products ), [Stock Turnover], 0.75 )
+VAR p25 = PERCENTILEX.INC ( ALL ( dim_products ), [Stock Turnover], 0.25 )
+RETURN IF ( t >= p75, "Fast", IF ( t <= p25, "Slow", "Medium" ) )
+
+// ---- Top N by revenue (used with Top N filter on visual: Top 10 by [Total Sales]) ----
+Revenue Rank = RANKX ( ALL ( dim_products[product_name] ), [Total Sales], , DESC )

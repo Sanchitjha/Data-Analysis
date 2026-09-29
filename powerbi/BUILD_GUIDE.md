@@ -1,0 +1,38 @@
+# Power BI build guide (about 1–2 hours)
+
+`.pbix` files can only be created in Power BI Desktop (Windows), so that step is yours. Everything else is prepared.
+The `.pbix` and screenshots you add must be your own work – you will be asked to walk through them in an interview.
+
+## 1. Load data
+Get Data → Text/CSV → load `fact_sales.csv`, `dim_products.csv`, `fact_restocks.csv` from this folder
+(`order_date` and `restock_date` as *Date*, prices as *Fixed decimal number*).
+Alternative for the SQL angle: Get Data → PostgreSQL database → `inventory` (tables created by `sql/01_schema.sql`).
+
+## 2. Model
+1. New table → paste `dim_date` from `measures.dax`; Table tools → *Mark as date table*.
+2. Relationships (all one-to-many, single direction):
+   `dim_products[product_id]` → `fact_sales[product_id]`, `dim_products[product_id]` → `fact_restocks[product_id]`,
+   `dim_date[Date]` → `fact_sales[order_date]`.
+3. Paste the measures from `measures.dax` (New measure, one at a time).
+
+## 3. Report page layout
+| Area | Visual | Fields |
+|---|---|---|
+| Top row | 4 × Card | `Total Sales`, `Units Sold`, `Total Stock`, `Low-Stock Items` (red font) |
+| Left | Line chart | Axis `dim_date[Month]` (sorted by Month Sort), Values `Total Sales` |
+| Right | Clustered bar | Axis `product_name`, Values `Stock Turnover`; Top N filter → top 10 (fast) — duplicate visual with Bottom 10 (slow) |
+| Bottom | Table (reorder alert) | `product_name`, `category`, `current_stock`, `reorder_level`, `Shortfall`, `lead_time_days`; visual filter `Reorder Status = REORDER`; red background when stock = 0 |
+| Side | Slicers | `dim_products[category]` (list), `dim_date[Date]` (between) |
+
+Optional: a Top-10-by-revenue bar using `Revenue Rank`, and a Category donut on `Total Sales`.
+
+## 4. Optional reorder alert notification
+Publish to Power BI Service → pin the `Low-Stock Items` card to a dashboard → *Manage alerts* → alert when above 0
+(needs a Pro/Fabric account; otherwise the red card + reorder table is the in-report alert).
+
+## 5. Deliverables to add to the repo
+- `powerbi/Inventory_Sales_Dashboard.pbix`
+- Screenshots of your real report in `screenshots/` (`screenshots/dashboard_layout_preview.png` is only a matplotlib mock-up of the target layout)
+
+## Numbers you should see (sanity check)
+Total Sales 1,786,662 · Units Sold 111,664 · Total Stock 5,074 · Low-Stock Items 17.
