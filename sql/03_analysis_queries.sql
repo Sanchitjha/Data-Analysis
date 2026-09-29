@@ -28,35 +28,15 @@ SELECT month, revenue, units,
              / LAG(revenue) OVER (ORDER BY month), 1) AS mom_growth_pct
 FROM monthly ORDER BY month;
 
+-- Requires sql/04_views.sql to have been run (the ETL does this).
 -- 4. Stock turnover per product ------------------------------------------------------
 -- turnover = units sold / average stock,  average stock = (opening stock + current stock) / 2
 -- opening stock = the first restock row (initial stock-in on the first day)
-CREATE OR REPLACE VIEW v_stock_turnover AS
-WITH opening AS (
-    SELECT DISTINCT ON (product_id) product_id, quantity AS opening_stock
-    FROM restocks ORDER BY product_id, restock_date
-), sold AS (
-    SELECT product_id, SUM(quantity) AS units_sold, SUM(revenue) AS revenue,
-           MAX(order_date) - MIN(order_date) + 1 AS days_selling
-    FROM sales GROUP BY product_id
-), stocked AS (
-    SELECT product_id, SUM(quantity) AS units_restocked, COUNT(*) - 1 AS restock_events
-    FROM restocks GROUP BY product_id
-)
-SELECT p.product_id, p.product_name, p.category,
-       p.current_stock, p.reorder_level,
-       sd.units_sold, st.units_restocked, st.restock_events,
-       ROUND((o.opening_stock + p.current_stock) / 2.0, 1)                        AS avg_stock,
-       ROUND(sd.units_sold / ((o.opening_stock + p.current_stock) / 2.0), 2)      AS stock_turnover,
-       ROUND(sd.days_selling / (sd.units_sold / ((o.opening_stock + p.current_stock) / 2.0)), 0) AS days_of_inventory
-FROM products p
-JOIN opening o USING (product_id)
-JOIN sold sd USING (product_id)
-JOIN stocked st USING (product_id);
+-- (view v_stock_turnover is defined in sql/04_views.sql)
 
 SELECT * FROM v_stock_turnover ORDER BY stock_turnover DESC;
 
--- 5. Fast vs slow movers (quartiles of turnover) -----------------------------------------
+-- 5. Fast vs slow movers (quartiles of turnover; also available as v_stock_turnover_classified)
 SELECT product_name, category, stock_turnover, days_of_inventory,
        CASE NTILE(4) OVER (ORDER BY stock_turnover DESC)
             WHEN 1 THEN 'Fast'

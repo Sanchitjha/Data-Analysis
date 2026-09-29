@@ -1,0 +1,2 @@
+expression DataFolder = "C:\path\to\Data-Analysis\powerbi" /* CHANGE ME */ meta [IsParameterQuery=true, Type="Text", IsParameterQueryRequired=true]
+	lineageTag: c9bdbbad-c0de-5aa3-bc8a-b12007ac4f26

@@ -1,9 +1,12 @@
 """Static preview of the dashboard layout, rendered with matplotlib from the same clean data.
 NOT a Power BI screenshot - the real dashboard lives in powerbi/ (see powerbi/BUILD_GUIDE.md)."""
-import pandas as pd, matplotlib
+import matplotlib
+import pandas as pd
+
 matplotlib.use("Agg")
-import matplotlib.pyplot as plt
 from pathlib import Path
+
+import matplotlib.pyplot as plt
 
 ROOT = Path(__file__).resolve().parent.parent
 s = pd.read_csv(ROOT/"data/clean/sales.csv", parse_dates=["order_date"])

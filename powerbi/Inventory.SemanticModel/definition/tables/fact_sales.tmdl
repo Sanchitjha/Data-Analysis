@@ -1,0 +1,56 @@
+table fact_sales
+	lineageTag: bfa344ba-054c-5b18-b8dc-c6922163f0ed
+
+	column order_id
+		dataType: string
+		lineageTag: e314aed7-ef8b-5e9f-8a13-28c60f714caf
+		summarizeBy: none
+		sourceColumn: order_id
+
+	column order_date
+		dataType: dateTime
+		lineageTag: 0605f759-0e95-5459-ba02-5625277287c5
+		summarizeBy: none
+		sourceColumn: order_date
+		formatString: yyyy-mm-dd
+
+	column product_id
+		dataType: string
+		lineageTag: 44249956-0d5a-5697-851a-58c12bd5c5cb
+		summarizeBy: none
+		sourceColumn: product_id
+
+	column quantity
+		dataType: int64
+		lineageTag: 5efc7e92-7d64-5c47-bc02-1aad5d66a804
+		summarizeBy: sum
+		sourceColumn: quantity
+
+	column unit_price
+		dataType: double
+		lineageTag: 3b467dee-38f2-5473-b753-95b614d475a3
+		summarizeBy: none
+		sourceColumn: unit_price
+
+	column store
+		dataType: string
+		lineageTag: 0d414ebf-3023-5d82-b99e-6a643a74d328
+		summarizeBy: none
+		sourceColumn: store
+
+	column revenue
+		dataType: double
+		lineageTag: c00f01b4-95bb-5d19-a635-b762453f2dbc
+		summarizeBy: sum
+		sourceColumn: revenue
+		formatString: $#,0.00
+
+	partition fact_sales = m
+		mode: import
+		source =
+				let
+				    Source = Csv.Document(File.Contents(DataFolder & "\fact_sales.csv"), [Delimiter=",", Encoding=65001, QuoteStyle=QuoteStyle.Csv]),
+				    Promoted = Table.PromoteHeaders(Source, [PromoteAllScalars=true]),
+				    Typed = Table.TransformColumnTypes(Promoted, {{"order_id", type text}, {"order_date", type date}, {"product_id", type text}, {"quantity", Int64.Type}, {"unit_price", type number}, {"store", type text}, {"revenue", type number}}, "en-US")
+				in
+				    Typed

@@ -1,0 +1,24 @@
+Metadata-Version: 2.4
+Name: invsales
+Version: 1.0.0
+Summary: Inventory & Sales Analytics: ETL, PostgreSQL, Streamlit dashboard, reorder alerts
+Requires-Python: >=3.10
+Requires-Dist: pandas>=2.0
+Requires-Dist: numpy
+Requires-Dist: sqlalchemy>=2.0
+Requires-Dist: psycopg2-binary
+Requires-Dist: requests
+Provides-Extra: dashboard
+Requires-Dist: streamlit>=1.30; extra == "dashboard"
+Requires-Dist: plotly>=5.18; extra == "dashboard"
+Provides-Extra: kaggle
+Requires-Dist: kaggle; extra == "kaggle"
+Provides-Extra: dev
+Requires-Dist: pytest; extra == "dev"
+Requires-Dist: pytest-cov; extra == "dev"
+Requires-Dist: ruff; extra == "dev"
+Requires-Dist: openpyxl; extra == "dev"
+Requires-Dist: matplotlib; extra == "dev"
+Requires-Dist: nbformat; extra == "dev"
+Requires-Dist: nbconvert; extra == "dev"
+Requires-Dist: ipykernel; extra == "dev"

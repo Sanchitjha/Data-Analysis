@@ -1,0 +1,31 @@
+table fact_restocks
+	lineageTag: 0f5f80d1-843a-5157-8b04-fb1e38a3eac8
+
+	column restock_date
+		dataType: dateTime
+		lineageTag: edc58eee-500c-5742-9434-5fa8fc8e9cea
+		summarizeBy: none
+		sourceColumn: restock_date
+		formatString: yyyy-mm-dd
+
+	column product_id
+		dataType: string
+		lineageTag: f92b0fa1-3aaf-507a-bf37-f84572ded2cb
+		summarizeBy: none
+		sourceColumn: product_id
+
+	column quantity
+		dataType: int64
+		lineageTag: dabd8b0f-7ca8-570d-97f4-8c6225001527
+		summarizeBy: sum
+		sourceColumn: quantity
+
+	partition fact_restocks = m
+		mode: import
+		source =
+				let
+				    Source = Csv.Document(File.Contents(DataFolder & "\fact_restocks.csv"), [Delimiter=",", Encoding=65001, QuoteStyle=QuoteStyle.Csv]),
+				    Promoted = Table.PromoteHeaders(Source, [PromoteAllScalars=true]),
+				    Typed = Table.TransformColumnTypes(Promoted, {{"restock_date", type date}, {"product_id", type text}, {"quantity", Int64.Type}}, "en-US")
+				in
+				    Typed

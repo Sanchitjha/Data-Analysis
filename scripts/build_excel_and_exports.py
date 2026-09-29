@@ -1,10 +1,11 @@
 """Builds (1) excel/Inventory_Sales_Summary.xlsx and (2) powerbi/*.csv model tables from data/clean."""
-import pandas as pd
 from pathlib import Path
+
+import pandas as pd
 from openpyxl import Workbook
-from openpyxl.styles import Font, PatternFill, Alignment
-from openpyxl.utils import get_column_letter
 from openpyxl.formatting.rule import CellIsRule
+from openpyxl.styles import Alignment, Font, PatternFill
+from openpyxl.utils import get_column_letter
 
 ROOT = Path(__file__).resolve().parent.parent
 sales = pd.read_csv(ROOT/"data/clean/sales.csv", parse_dates=["order_date"])
@@ -40,6 +41,7 @@ for row in wd.iter_rows(min_row=2, min_col=2, max_col=4):
     row[0].number_format = "yyyy-mm-dd"; row[2].number_format = "mmm yyyy"
 header(wd); widths(wd, 15); wd.freeze_panes = "A2"
 from openpyxl.worksheet.table import Table, TableStyleInfo
+
 t = Table(displayName="SalesData", ref=f"A1:K{len(df)+1}"); t.tableStyleInfo = TableStyleInfo(name="TableStyleLight9", showRowStripes=True)
 wd.add_table(t)
 N = len(df) + 1
@@ -70,6 +72,7 @@ for row in wm.iter_rows(min_row=2, max_col=1): row[0].number_format = "mmm yyyy"
 for r in wm.iter_rows(min_row=2, min_col=2, max_col=3):
     for c in r: c.number_format = "#,##0"
 from openpyxl.chart import LineChart, Reference
+
 ch = LineChart(); ch.title = "Monthly Sales"; ch.height, ch.width = 8, 18
 ch.add_data(Reference(wm, min_col=2, min_row=1, max_row=wm.max_row), titles_from_data=True)
 ch.set_categories(Reference(wm, min_col=1, min_row=2, max_row=wm.max_row)); wm.add_chart(ch, "E2")

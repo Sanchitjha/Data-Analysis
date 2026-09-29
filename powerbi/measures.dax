@@ -38,9 +38,15 @@ Low-Stock Items =
 COUNTROWS ( FILTER ( dim_products, dim_products[current_stock] <= dim_products[reorder_level] ) )
 
 Opening Stock =
-CALCULATE (
-    SUM ( fact_restocks[quantity] ),
-    fact_restocks[restock_date] = MIN ( fact_restocks[restock_date] )   // first stock-in per product
+SUMX (
+    VALUES ( dim_products[product_id] ),
+    CALCULATE (
+        SUM ( fact_restocks[quantity] ),
+        FILTER (
+            ALL ( fact_restocks[restock_date] ),
+            fact_restocks[restock_date] = CALCULATE ( MIN ( fact_restocks[restock_date] ) )   // first stock-in per product
+        )
+    )
 )
 
 Average Stock = DIVIDE ( [Opening Stock] + [Total Stock], 2 )

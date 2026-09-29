@@ -1,0 +1,11 @@
+relationship 9fc3f443-0f5d-5265-b3fe-af91bed4d402
+	fromColumn: fact_sales.product_id
+	toColumn: dim_products.product_id
+
+relationship 6721905f-4987-539d-a2fc-4115dc897502
+	fromColumn: fact_restocks.product_id
+	toColumn: dim_products.product_id
+
+relationship c6c4bbdd-8699-5678-8f37-f344d3a5d4fc
+	fromColumn: fact_sales.order_date
+	toColumn: dim_date.Date
