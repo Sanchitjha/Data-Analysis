@@ -56,46 +56,48 @@ def measure(name, expr, fmt=None, folder=None):
     return "\n".join(lines) + "\n"
 
 
-MEASURES = [
-    measure("Total Sales", "SUM(fact_sales[revenue])", "$#,0", "Sales"),
-    measure("Units Sold", "SUM(fact_sales[quantity])", "#,0", "Sales"),
-    measure("Gross Profit", "SUMX(fact_sales, fact_sales[revenue] - fact_sales[quantity] * RELATED(dim_products[unit_cost]))",
-            "$#,0", "Sales"),
-    measure("Gross Margin %", "DIVIDE([Gross Profit], [Total Sales])", "0.0%", "Sales"),
-    measure("Sales LY", "CALCULATE([Total Sales], SAMEPERIODLASTYEAR(dim_date[Date]))", "$#,0", "Sales"),
-    measure("Sales YoY %", "DIVIDE([Total Sales] - [Sales LY], [Sales LY])", "0.0%", "Sales"),
-    measure("Total Stock", "SUM(dim_products[current_stock])", "#,0", "Inventory"),
-    measure("Low-Stock Items",
-            "COUNTROWS(FILTER(dim_products, dim_products[current_stock] <= dim_products[reorder_level]))", "#,0", "Inventory"),
-    measure("Opening Stock",
-            "SUMX(VALUES(dim_products[product_id]), CALCULATE(SUM(fact_restocks[quantity]), "
-            "FILTER(ALL(fact_restocks[restock_date]), fact_restocks[restock_date] = "
-            "CALCULATE(MIN(fact_restocks[restock_date])))))", "#,0", "Inventory"),
-    measure("Average Stock", "DIVIDE([Opening Stock] + [Total Stock], 2)", "#,0.0", "Inventory"),
-    measure("Stock Turnover", "DIVIDE([Units Sold], [Average Stock])", "0.00", "Inventory"),
-    measure("Days of Inventory", "DIVIDE(730, [Stock Turnover])", "0", "Inventory"),
-    measure("Reorder Status",
-            'IF(SELECTEDVALUE(dim_products[current_stock]) <= SELECTEDVALUE(dim_products[reorder_level]), "REORDER", "OK")',
-            None, "Inventory"),
-    measure("Shortfall",
-            "MAX(0, SELECTEDVALUE(dim_products[reorder_level]) - SELECTEDVALUE(dim_products[current_stock]))", "#,0", "Inventory"),
-    measure("Movement Class",
-            'VAR t = [Stock Turnover] '
-            'VAR p75 = PERCENTILEX.INC(ALL(dim_products), [Stock Turnover], 0.75) '
-            'VAR p25 = PERCENTILEX.INC(ALL(dim_products), [Stock Turnover], 0.25) '
-            'RETURN IF(t >= p75, "Fast", IF(t <= p25, "Slow", "Medium"))', None, "Inventory"),
-    measure("Revenue Rank", "RANKX(ALL(dim_products[product_name]), [Total Sales], , DESC)", "0", "Sales"),
+MEASURE_DEFS = [
+    ("Total Sales", "SUM(fact_sales[revenue])", "$#,0", "Sales"),
+    ("Units Sold", "SUM(fact_sales[quantity])", "#,0", "Sales"),
+    ("Gross Profit", "SUMX(fact_sales, fact_sales[revenue] - fact_sales[quantity] * RELATED(dim_products[unit_cost]))", "$#,0", "Sales"),
+    ("Gross Margin %", "DIVIDE([Gross Profit], [Total Sales])", "0.0%", "Sales"),
+    ("Sales LY", "CALCULATE([Total Sales], SAMEPERIODLASTYEAR(dim_date[Date]))", "$#,0", "Sales"),
+    ("Sales YoY %", "DIVIDE([Total Sales] - [Sales LY], [Sales LY])", "0.0%", "Sales"),
+    ("Revenue Rank", "RANKX(ALL(dim_products[product_name]), [Total Sales], , DESC)", "0", "Sales"),
+    ("Total Stock", "SUM(fact_inventory[current_stock])", "#,0", "Inventory"),
+    ("Low-Stock Items",
+     "COUNTROWS(FILTER(fact_inventory, fact_inventory[current_stock] <= fact_inventory[reorder_level]))", "#,0", "Inventory"),
+    # opening stock = the stock-in on the first day of history (the simulator/ETL writes one opening row per warehouse x product)
+    ("Opening Stock",
+     "CALCULATE(SUM(fact_restocks[quantity]), FILTER(ALL(fact_restocks[restock_date]), "
+     "fact_restocks[restock_date] = CALCULATE(MIN(fact_restocks[restock_date]), ALL(fact_restocks))))", "#,0", "Inventory"),
+    ("Average Stock", "DIVIDE([Opening Stock] + [Total Stock], 2)", "#,0.0", "Inventory"),
+    ("Stock Turnover", "DIVIDE([Units Sold], [Average Stock])", "0.00", "Inventory"),
+    ("Days in Period",
+     "DATEDIFF(CALCULATE(MIN(fact_sales[order_date]), ALL(fact_sales)), CALCULATE(MAX(fact_sales[order_date]), ALL(fact_sales)), DAY) + 1",
+     "0", "Inventory"),
+    ("Days of Inventory", "DIVIDE([Days in Period], [Stock Turnover])", "0", "Inventory"),
+    ("Reorder Status", 'IF(SUM(fact_inventory[current_stock]) <= SUM(fact_inventory[reorder_level]), "REORDER", "OK")', None, "Inventory"),
+    ("Shortfall", "MAX(0, SUM(fact_inventory[reorder_level]) - SUM(fact_inventory[current_stock]))", "#,0", "Inventory"),
+    ("Movement Class",
+     'VAR t = [Stock Turnover] VAR p75 = PERCENTILEX.INC(ALL(dim_products), [Stock Turnover], 0.75) '
+     'VAR p25 = PERCENTILEX.INC(ALL(dim_products), [Stock Turnover], 0.25) '
+     'RETURN IF(t >= p75, "Fast", IF(t <= p25, "Slow", "Medium"))', None, "Inventory"),
 ]
+MEASURES = [measure(*m) for m in MEASURE_DEFS]
 
 S, I, D, T = "string", "int64", "double", "dateTime"
-SALES = [("order_id", S, "type text", "none"), ("order_date", T, "type date", "none"), ("product_id", S, "type text", "none"),
-         ("quantity", I, "Int64.Type", "sum"), ("unit_price", D, "type number", "none"), ("store", S, "type text", "none"),
+SALES = [("order_id", S, "type text", "none"), ("order_date", T, "type date", "none"), ("warehouse_id", S, "type text", "none"),
+         ("product_id", S, "type text", "none"), ("quantity", I, "Int64.Type", "sum"), ("unit_price", D, "type number", "none"),
          ("revenue", D, "type number", "sum")]
 PRODUCTS = [("product_id", S, "type text", "none"), ("product_name", S, "type text", "none"), ("category", S, "type text", "none"),
             ("unit_cost", D, "type number", "none"), ("unit_price", D, "type number", "none"),
-            ("lead_time_days", I, "Int64.Type", "none"), ("reorder_level", I, "Int64.Type", "none"),
-            ("current_stock", I, "Int64.Type", "sum")]
-RESTOCKS = [("restock_date", T, "type date", "none"), ("product_id", S, "type text", "none"), ("quantity", I, "Int64.Type", "sum")]
+            ("lead_time_days", I, "Int64.Type", "none")]
+WAREHOUSES = [("warehouse_id", S, "type text", "none"), ("warehouse_name", S, "type text", "none"), ("region", S, "type text", "none")]
+INVENTORY = [("warehouse_id", S, "type text", "none"), ("product_id", S, "type text", "none"),
+             ("current_stock", I, "Int64.Type", "sum"), ("reorder_level", I, "Int64.Type", "sum")]
+RESTOCKS = [("restock_date", T, "type date", "none"), ("warehouse_id", S, "type text", "none"), ("product_id", S, "type text", "none"),
+            ("quantity", I, "Int64.Type", "sum")]
 
 DATE_TABLE = f"""table dim_date
 \tlineageTag: {uid('dim_date')}
@@ -150,20 +152,24 @@ w(SM / "definition.pbism", json.dumps({"version": "4.0", "settings": {}}, indent
 w(SM / "definition" / "database.tmdl", "database\n\tcompatibilityLevel: 1600\n")
 w(SM / "definition" / "model.tmdl",
   "model Model\n\tculture: en-US\n\tdefaultPowerBIDataSourceVersion: powerBI_V3\n\tdiscourageImplicitMeasures\n\n"
-  "ref table fact_sales\nref table dim_products\nref table fact_restocks\nref table dim_date\nref table _Measures\n"
+  "ref table fact_sales\nref table fact_inventory\nref table fact_restocks\nref table dim_products\nref table dim_warehouses\nref table dim_date\nref table _Measures\n"
   "ref expression DataFolder\n")
 w(SM / "definition" / "expressions.tmdl",
   'expression DataFolder = "C:\\path\\to\\Data-Analysis\\powerbi" '
   '/* CHANGE ME */ meta [IsParameterQuery=true, Type="Text", IsParameterQueryRequired=true]\n'
   f"\tlineageTag: {uid('DataFolder')}\n")
+RELS = [("fact_sales.product_id", "dim_products.product_id"), ("fact_sales.warehouse_id", "dim_warehouses.warehouse_id"),
+        ("fact_sales.order_date", "dim_date.Date"), ("fact_inventory.product_id", "dim_products.product_id"),
+        ("fact_inventory.warehouse_id", "dim_warehouses.warehouse_id"), ("fact_restocks.product_id", "dim_products.product_id"),
+        ("fact_restocks.warehouse_id", "dim_warehouses.warehouse_id")]
 w(SM / "definition" / "relationships.tmdl",
-  f"relationship {uid('r1')}\n\tfromColumn: fact_sales.product_id\n\ttoColumn: dim_products.product_id\n\n"
-  f"relationship {uid('r2')}\n\tfromColumn: fact_restocks.product_id\n\ttoColumn: dim_products.product_id\n\n"
-  f"relationship {uid('r3')}\n\tfromColumn: fact_sales.order_date\n\ttoColumn: dim_date.Date\n")
+  "\n".join(f"relationship {uid('rel' + a)}\n\tfromColumn: {a}\n\ttoColumn: {b}\n" for a, b in RELS))
 tables = SM / "definition" / "tables"
 w(tables / "fact_sales.tmdl", table("fact_sales", SALES, {"revenue": "$#,0.00", "order_date": "yyyy-mm-dd"}))
 w(tables / "fact_restocks.tmdl", table("fact_restocks", RESTOCKS, {"restock_date": "yyyy-mm-dd"}))
 w(tables / "dim_products.tmdl", table("dim_products", PRODUCTS))
+w(tables / "dim_warehouses.tmdl", table("dim_warehouses", WAREHOUSES))
+w(tables / "fact_inventory.tmdl", table("fact_inventory", INVENTORY))
 w(tables / "dim_date.tmdl", DATE_TABLE)
 w(tables / "_Measures.tmdl",
   f"table _Measures\n\tlineageTag: {uid('_Measures')}\n\n" + "\n".join(MEASURES) +
@@ -187,4 +193,16 @@ w(RP / "definition" / "pages" / "InventoryOverview" / "page.json", json.dumps({
     "$schema": f"{SCHEMA}/page/1.0.0/schema.json", "name": "InventoryOverview", "displayName": "Inventory Overview",
     "displayOption": "FitToPage", "height": 720, "width": 1280}, indent=2))
 w(ROOT / ".gitignore", ".pbi/\n")
+dax = ["// Generated by scripts/build_pbip.py from the same definitions as the TMDL model - do not edit by hand.",
+       "// Model: dim_products (1)-(*) fact_sales / fact_inventory / fact_restocks; dim_warehouses (1)-(*) the same three;",
+       "//        dim_date (1)-(*) fact_sales via order_date", "",
+       "// Calculated table (Modeling > New table):",
+       'dim_date = ADDCOLUMNS(CALENDAR(DATE(2024, 1, 1), DATE(2025, 12, 31)), "Year", YEAR([Date]), "Month No", MONTH([Date]),',
+       '    "Month", FORMAT([Date], "MMM yyyy"), "Month Sort", YEAR([Date]) * 100 + MONTH([Date]))',
+       "// then: Month -> Sort by column -> Month Sort ; mark as date table on [Date]", ""]
+for name, expr, _, folder in MEASURE_DEFS:
+    dax.append(f"// [{folder}]")
+    dax.append(f"{name} = {expr}")
+    dax.append("")
+(ROOT / "measures.dax").write_text("\n".join(dax), encoding="utf-8")
 print("PBIP written to", ROOT)

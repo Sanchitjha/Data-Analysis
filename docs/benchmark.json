@@ -1,0 +1,29 @@
+{
+  "rows":{
+    "sales":1474989,
+    "inventory":1800,
+    "restocks":26110
+  },
+  "table_size_mb":"229.8",
+  "queries_ms":{
+    "KPI summary (v_kpi_summary)":107.9,
+    "Monthly sales + MoM growth":176.3,
+    "Top 10 products by revenue":120.3,
+    "Warehouse summary":91.7,
+    "Reorder alerts (v_reorder_alerts)":24.9,
+    "Stock turnover, classified":188.4,
+    "One warehouse, one month (index range scan)":5.0,
+    "One product, daily series (index scan)":9.7
+  },
+  "no_index_ms":{
+    "One warehouse, one month (index range scan)":37.2,
+    "One product, daily series (index scan)":56.6
+  },
+  "load_into_pandas_s":3.5,
+  "pandas_mem_mb":103,
+  "analytics_s":{
+    "ABC-XYZ":0.45,
+    "Replenishment (ROP\/EOQ) for all warehouse x product":0.86,
+    "Forecast 30d + backtest":0.32
+  }
+}

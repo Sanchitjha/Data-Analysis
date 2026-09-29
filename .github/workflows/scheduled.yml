@@ -1,0 +1,46 @@
+name: Scheduled refresh and alerts
+# Daily ETL + reorder alerts. In a real deployment step 1 would pull from the source system (ERP/WMS export);
+# here it regenerates the seeded demo data so the whole chain is exercised.
+# Optional repository secrets: DATABASE_URL (hosted PostgreSQL), SLACK_WEBHOOK_URL, SMTP_HOST/SMTP_PORT/SMTP_USER/
+# SMTP_PASSWORD/ALERT_FROM/ALERT_TO. Without DATABASE_URL the job runs file-based (no database load).
+on:
+  schedule:
+    - cron: "30 2 * * *"
+  workflow_dispatch:
+    inputs:
+      send:
+        description: "Actually send alerts (otherwise dry run)"
+        type: boolean
+        default: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+      SMTP_HOST: ${{ secrets.SMTP_HOST }}
+      SMTP_PORT: ${{ secrets.SMTP_PORT }}
+      SMTP_USER: ${{ secrets.SMTP_USER }}
+      SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+      ALERT_FROM: ${{ secrets.ALERT_FROM }}
+      ALERT_TO: ${{ secrets.ALERT_TO }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.12", cache: pip}
+      - run: pip install -e .
+      - name: ETL
+        run: |
+          if [ -n "$DATABASE_URL" ]; then invsales all; else invsales all --no-db; fi
+      - name: Reorder alerts
+        run: |
+          if [ "${{ github.event_name }}" = "schedule" ] || [ "${{ inputs.send }}" = "true" ]; then
+            invsales alerts --send
+          else
+            invsales alerts
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: etl-report
+          path: data/demo/clean/cleaning_report.json

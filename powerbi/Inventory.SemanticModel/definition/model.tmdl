@@ -4,8 +4,10 @@ model Model
 	discourageImplicitMeasures
 
 ref table fact_sales
-ref table dim_products
+ref table fact_inventory
 ref table fact_restocks
+ref table dim_products
+ref table dim_warehouses
 ref table dim_date
 ref table _Measures
 ref expression DataFolder

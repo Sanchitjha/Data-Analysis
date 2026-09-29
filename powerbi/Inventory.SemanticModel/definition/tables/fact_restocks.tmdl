@@ -8,6 +8,12 @@ table fact_restocks
 		sourceColumn: restock_date
 		formatString: yyyy-mm-dd
 
+	column warehouse_id
+		dataType: string
+		lineageTag: d1da1f49-db3a-5517-ab2c-3f42c096bf5c
+		summarizeBy: none
+		sourceColumn: warehouse_id
+
 	column product_id
 		dataType: string
 		lineageTag: f92b0fa1-3aaf-507a-bf37-f84572ded2cb
@@ -26,6 +32,6 @@ table fact_restocks
 				let
 				    Source = Csv.Document(File.Contents(DataFolder & "\fact_restocks.csv"), [Delimiter=",", Encoding=65001, QuoteStyle=QuoteStyle.Csv]),
 				    Promoted = Table.PromoteHeaders(Source, [PromoteAllScalars=true]),
-				    Typed = Table.TransformColumnTypes(Promoted, {{"restock_date", type date}, {"product_id", type text}, {"quantity", Int64.Type}}, "en-US")
+				    Typed = Table.TransformColumnTypes(Promoted, {{"restock_date", type date}, {"warehouse_id", type text}, {"product_id", type text}, {"quantity", Int64.Type}}, "en-US")
 				in
 				    Typed

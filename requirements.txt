@@ -6,4 +6,5 @@ pandas>=2.0
 numpy
 sqlalchemy>=2.0
 psycopg2-binary
+pyarrow
 requests

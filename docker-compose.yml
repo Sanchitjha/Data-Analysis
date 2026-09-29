@@ -1,5 +1,6 @@
-# docker compose up --build        -> db + one-shot ETL + dashboard on http://localhost:8501
-# docker compose run --rm alerts   -> dry-run alert;  add --send to really send
+# docker compose up --build                       -> db + one-shot ETL + dashboard (:8501) + REST API (:8000)
+# PRESET=large docker compose up --build          -> same with the 1.5M-row dataset (takes ~1-2 minutes to build)
+# docker compose run --rm alerts                  -> dry-run alert;  append --send after configuring .env
 services:
   db:
     image: postgres:16
@@ -17,10 +18,11 @@ services:
 
   etl:
     build: .
-    command: ["invsales", "all"]          # generate synthetic data + clean + validate + load
+    command: ["invsales", "all"]          # generate + clean + validate + load
     environment: &app-env
       DATABASE_URL: postgresql+psycopg2://inventory:${POSTGRES_PASSWORD:-inventory}@db:5432/inventory
       DATA_DIR: /app/data
+      PRESET: ${PRESET:-demo}
     env_file: [{path: .env, required: false}]
     volumes: [appdata:/app/data]
     depends_on:
@@ -32,6 +34,20 @@ services:
     env_file: [{path: .env, required: false}]
     volumes: [appdata:/app/data]
     ports: ["8501:8501"]
+    depends_on:
+      etl: {condition: service_completed_successfully}
+    restart: unless-stopped
+
+  api:
+    build: .
+    command: ["uvicorn", "invsales.api:app", "--host", "0.0.0.0", "--port", "8000"]
+    environment:
+      <<: *app-env
+      HEALTH_PORT: "8000"
+      HEALTH_PATH: health
+    env_file: [{path: .env, required: false}]
+    volumes: [appdata:/app/data]
+    ports: ["8000:8000"]
     depends_on:
       etl: {condition: service_completed_successfully}
     restart: unless-stopped

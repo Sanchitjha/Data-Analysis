@@ -31,17 +31,22 @@ table _Measures
 		formatString: 0.0%
 		displayFolder: Sales
 
-	measure 'Total Stock' = SUM(dim_products[current_stock])
+	measure 'Revenue Rank' = RANKX(ALL(dim_products[product_name]), [Total Sales], , DESC)
+		lineageTag: 1f9e1591-508d-5014-b314-703fba310793
+		formatString: 0
+		displayFolder: Sales
+
+	measure 'Total Stock' = SUM(fact_inventory[current_stock])
 		lineageTag: 75cfdf22-67bb-5201-ace1-9f7fd4fd4d9a
 		formatString: #,0
 		displayFolder: Inventory
 
-	measure 'Low-Stock Items' = COUNTROWS(FILTER(dim_products, dim_products[current_stock] <= dim_products[reorder_level]))
+	measure 'Low-Stock Items' = COUNTROWS(FILTER(fact_inventory, fact_inventory[current_stock] <= fact_inventory[reorder_level]))
 		lineageTag: 1491b192-7c25-5547-a0ba-a094e5985955
 		formatString: #,0
 		displayFolder: Inventory
 
-	measure 'Opening Stock' = SUMX(VALUES(dim_products[product_id]), CALCULATE(SUM(fact_restocks[quantity]), FILTER(ALL(fact_restocks[restock_date]), fact_restocks[restock_date] = CALCULATE(MIN(fact_restocks[restock_date])))))
+	measure 'Opening Stock' = CALCULATE(SUM(fact_restocks[quantity]), FILTER(ALL(fact_restocks[restock_date]), fact_restocks[restock_date] = CALCULATE(MIN(fact_restocks[restock_date]), ALL(fact_restocks))))
 		lineageTag: b110bd3f-d5a3-5786-9f63-87fec55e2c4c
 		formatString: #,0
 		displayFolder: Inventory
@@ -56,16 +61,21 @@ table _Measures
 		formatString: 0.00
 		displayFolder: Inventory
 
-	measure 'Days of Inventory' = DIVIDE(730, [Stock Turnover])
+	measure 'Days in Period' = DATEDIFF(CALCULATE(MIN(fact_sales[order_date]), ALL(fact_sales)), CALCULATE(MAX(fact_sales[order_date]), ALL(fact_sales)), DAY) + 1
+		lineageTag: be1c01d0-34fd-5cb3-9ff7-bca1196ae1c4
+		formatString: 0
+		displayFolder: Inventory
+
+	measure 'Days of Inventory' = DIVIDE([Days in Period], [Stock Turnover])
 		lineageTag: 59a9fdb9-42cc-512f-bac1-789603cfa4c7
 		formatString: 0
 		displayFolder: Inventory
 
-	measure 'Reorder Status' = IF(SELECTEDVALUE(dim_products[current_stock]) <= SELECTEDVALUE(dim_products[reorder_level]), "REORDER", "OK")
+	measure 'Reorder Status' = IF(SUM(fact_inventory[current_stock]) <= SUM(fact_inventory[reorder_level]), "REORDER", "OK")
 		lineageTag: e3fdb234-8f5f-5321-b105-3c094dbca0a7
 		displayFolder: Inventory
 
-	measure Shortfall = MAX(0, SELECTEDVALUE(dim_products[reorder_level]) - SELECTEDVALUE(dim_products[current_stock]))
+	measure Shortfall = MAX(0, SUM(fact_inventory[reorder_level]) - SUM(fact_inventory[current_stock]))
 		lineageTag: a8e9b3cb-76ce-5924-ae6a-d78f855853c4
 		formatString: #,0
 		displayFolder: Inventory
@@ -73,11 +83,6 @@ table _Measures
 	measure 'Movement Class' = VAR t = [Stock Turnover] VAR p75 = PERCENTILEX.INC(ALL(dim_products), [Stock Turnover], 0.75) VAR p25 = PERCENTILEX.INC(ALL(dim_products), [Stock Turnover], 0.25) RETURN IF(t >= p75, "Fast", IF(t <= p25, "Slow", "Medium"))
 		lineageTag: e3abee1b-a2cb-5cce-a261-f1df0f1e3402
 		displayFolder: Inventory
-
-	measure 'Revenue Rank' = RANKX(ALL(dim_products[product_name]), [Total Sales], , DESC)
-		lineageTag: 1f9e1591-508d-5014-b314-703fba310793
-		formatString: 0
-		displayFolder: Sales
 
 	partition _Measures = calculated
 		mode: import

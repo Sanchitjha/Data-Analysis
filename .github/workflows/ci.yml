@@ -20,11 +20,40 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with: {python-version: "3.12", cache: pip}
-      - run: pip install -e ".[dashboard,dev]"
+      - run: pip install -e ".[dashboard,api,dev]"
       - run: ruff check src tests app
       - run: pytest --cov=invsales --cov-report=term-missing
-      - name: End-to-end ETL against Postgres
+      - name: End-to-end ETL against Postgres, then alerts
         run: invsales all && invsales alerts
+      - name: API smoke test
+        run: |
+          uvicorn invsales.api:app --port 8000 &
+          for i in $(seq 1 30); do curl -sf localhost:8000/health && break || sleep 1; done
+          curl -sf localhost:8000/kpis && curl -sf "localhost:8000/replenishment?limit=1" && curl -sf localhost:8000/forecast/P1001
+      - name: Dashboard smoke test
+        run: |
+          streamlit run app/streamlit_app.py --server.headless true --server.port 8501 &
+          for i in $(seq 1 40); do curl -sf localhost:8501/_stcore/health && break || sleep 1; done
+
+  scale:
+    # the large preset (~1.5M rows) end to end: proves the pipeline and views at scale
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env: {POSTGRES_USER: inventory, POSTGRES_PASSWORD: inventory, POSTGRES_DB: inventory}
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U inventory" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql+psycopg2://inventory:inventory@localhost:5432/inventory
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.12", cache: pip}
+      - run: pip install -e .
+      - run: invsales --preset large all
+      - run: python scripts/benchmark.py
 
   docker:
     runs-on: ubuntu-latest

@@ -1,61 +1,61 @@
-product_id,product_name,category,unit_cost,unit_price,lead_time_days,reorder_level,current_stock
-P1001,Orange Juice 1L,Beverages,17.37,24.38,8,36,342
-P1002,Cola 2L,Beverages,3.43,5.46,13,58,132
-P1003,Green Tea 25 bags,Beverages,17.61,22.8,13,36,92
-P1004,Mineral Water 1L,Beverages,20.5,30.24,8,57,0
-P1005,Energy Drink 250ml,Beverages,10.59,14.08,4,4,5
-P1006,Coffee Beans 500g,Beverages,18.47,27.17,9,41,317
-P1007,Mango Drink 1L,Beverages,8.77,13.94,8,38,111
-P1008,Soda Water 500ml,Beverages,5.49,7.76,13,9,101
-P1009,Iced Tea 500ml,Beverages,4.66,6.94,14,158,341
-P1010,Coconut Water 330ml,Beverages,8.18,11.29,11,32,34
-P1011,Apple Juice 1L,Beverages,5.38,6.97,11,16,21
-P1012,Lemonade 1L,Beverages,15.23,21.37,8,58,528
-P1013,Potato Chips 150g,Snacks,15.86,21.56,12,90,37
-P1014,Salted Peanuts 200g,Snacks,9.44,12.75,12,56,179
-P1015,Chocolate Bar 50g,Snacks,4.36,5.76,12,55,105
-P1016,Cookies 300g,Snacks,15.13,22.65,3,14,65
-P1017,Popcorn 100g,Snacks,10.91,15.81,3,3,6
-P1018,Namkeen Mix 400g,Snacks,15.2,21.51,4,11,44
-P1019,Granola Bar 6pk,Snacks,17.18,25.29,9,25,198
-P1020,Cream Biscuits 200g,Snacks,7.73,9.75,9,25,197
-P1021,Cashew Nuts 250g,Snacks,5.9,8.22,14,20,0
-P1022,Wafers 75g,Snacks,2.7,3.64,13,19,105
-P1023,Trail Mix 300g,Snacks,15.07,21.78,9,41,0
-P1024,Rice Crackers 120g,Snacks,9.83,15.09,12,18,13
-P1025,Dish Soap 500ml,Household,1.97,2.52,12,34,207
-P1026,Laundry Detergent 2kg,Household,4.81,6.86,11,14,178
-P1027,Toilet Paper 12pk,Household,15.77,22.18,4,6,92
-P1028,Trash Bags 30pk,Household,14.42,19.85,7,5,8
-P1029,Floor Cleaner 1L,Household,3.92,6.22,7,33,321
-P1030,Paper Towels 6pk,Household,6.95,11.05,13,60,342
-P1031,Sponges 5pk,Household,16.2,22.8,11,8,9
-P1032,Air Freshener 300ml,Household,20.0,28.19,6,9,34
-P1033,Hand Wash 250ml,Household,7.77,11.29,9,66,154
-P1034,Bleach 1L,Household,17.05,25.61,5,14,48
-P1035,Glass Cleaner 500ml,Household,14.36,20.89,4,3,10
-P1036,Aluminium Foil 30m,Household,10.02,12.67,10,27,16
-P1037,Shampoo 340ml,Personal Care,8.26,10.74,11,31,15
-P1038,Toothpaste 150g,Personal Care,5.0,7.87,4,11,172
-P1039,Body Lotion 400ml,Personal Care,8.61,12.54,6,70,177
-P1040,Deodorant 150ml,Personal Care,11.39,17.36,3,3,3
-P1041,Face Wash 100ml,Personal Care,11.48,16.32,8,23,196
-P1042,Soap Bar 4pk,Personal Care,11.21,15.06,14,38,29
-P1043,Razor 3pk,Personal Care,12.17,17.08,6,43,484
-P1044,Sunscreen 100ml,Personal Care,19.87,25.81,3,9,182
-P1045,Hair Oil 200ml,Personal Care,3.73,5.54,4,19,293
-P1046,Mouthwash 500ml,Personal Care,16.4,24.91,6,5,98
-P1047,Hand Cream 75ml,Personal Care,20.28,26.98,5,14,381
-P1048,Lip Balm,Personal Care,9.1,14.02,3,22,466
-P1049,Basmati Rice 5kg,Staples,8.0,12.67,10,27,55
-P1050,Wheat Flour 5kg,Staples,6.75,10.65,6,8,26
-P1051,Sunflower Oil 1L,Staples,2.42,3.39,14,101,1038
-P1052,Sugar 1kg,Staples,16.85,26.32,14,100,64
-P1053,Toor Dal 1kg,Staples,12.14,16.52,3,14,148
-P1054,Salt 1kg,Staples,9.16,11.75,12,56,35
-P1055,Tea Powder 500g,Staples,6.88,10.86,14,19,0
-P1056,Pasta 500g,Staples,18.54,24.17,5,8,5
-P1057,Oats 1kg,Staples,13.79,21.46,3,5,89
-P1058,Ghee 500ml,Staples,17.44,27.73,5,15,192
-P1059,Chickpeas 1kg,Staples,4.45,5.58,5,7,93
-P1060,Honey 500g,Staples,15.39,19.89,5,15,196
+product_id,product_name,category,unit_cost,unit_price,lead_time_days
+P1001,Orange Juice 1L,Beverages,17.37,24.38,8
+P1002,Cola 2L,Beverages,3.43,5.46,13
+P1003,Green Tea 25 bags,Beverages,17.61,22.8,13
+P1004,Mineral Water 1L,Beverages,20.5,30.24,8
+P1005,Energy Drink 250ml,Beverages,10.59,14.08,4
+P1006,Coffee Beans 500g,Beverages,18.47,27.17,9
+P1007,Mango Drink 1L,Beverages,8.77,13.94,8
+P1008,Soda Water 500ml,Beverages,5.49,7.76,13
+P1009,Iced Tea 500ml,Beverages,4.66,6.94,14
+P1010,Coconut Water 330ml,Beverages,8.18,11.29,11
+P1011,Apple Juice 1L,Beverages,5.38,6.97,11
+P1012,Lemonade 1L,Beverages,15.23,21.37,8
+P1013,Potato Chips 150g,Snacks,15.86,21.56,12
+P1014,Salted Peanuts 200g,Snacks,9.44,12.75,12
+P1015,Chocolate Bar 50g,Snacks,4.36,5.76,12
+P1016,Cookies 300g,Snacks,15.13,22.65,3
+P1017,Popcorn 100g,Snacks,10.91,15.81,3
+P1018,Namkeen Mix 400g,Snacks,15.2,21.51,4
+P1019,Granola Bar 6pk,Snacks,17.18,25.29,9
+P1020,Cream Biscuits 200g,Snacks,7.73,9.75,9
+P1021,Cashew Nuts 250g,Snacks,5.9,8.22,14
+P1022,Wafers 75g,Snacks,2.7,3.64,13
+P1023,Trail Mix 300g,Snacks,15.07,21.78,9
+P1024,Rice Crackers 120g,Snacks,9.83,15.09,12
+P1025,Dish Soap 500ml,Household,1.97,2.52,12
+P1026,Laundry Detergent 2kg,Household,4.81,6.86,11
+P1027,Toilet Paper 12pk,Household,15.77,22.18,4
+P1028,Trash Bags 30pk,Household,14.42,19.85,7
+P1029,Floor Cleaner 1L,Household,3.92,6.22,7
+P1030,Paper Towels 6pk,Household,6.95,11.05,13
+P1031,Sponges 5pk,Household,16.2,22.8,11
+P1032,Air Freshener 300ml,Household,20.0,28.19,6
+P1033,Hand Wash 250ml,Household,7.77,11.29,9
+P1034,Bleach 1L,Household,17.05,25.61,5
+P1035,Glass Cleaner 500ml,Household,14.36,20.89,4
+P1036,Aluminium Foil 30m,Household,10.02,12.67,10
+P1037,Shampoo 340ml,Personal Care,8.26,10.74,11
+P1038,Toothpaste 150g,Personal Care,5.0,7.87,4
+P1039,Body Lotion 400ml,Personal Care,8.61,12.54,6
+P1040,Deodorant 150ml,Personal Care,11.39,17.36,3
+P1041,Face Wash 100ml,Personal Care,11.48,16.32,8
+P1042,Soap Bar 4pk,Personal Care,11.21,15.06,14
+P1043,Razor 3pk,Personal Care,12.17,17.08,6
+P1044,Sunscreen 100ml,Personal Care,19.87,25.81,3
+P1045,Hair Oil 200ml,Personal Care,3.73,5.54,4
+P1046,Mouthwash 500ml,Personal Care,16.4,24.91,6
+P1047,Hand Cream 75ml,Personal Care,20.28,26.98,5
+P1048,Lip Balm,Personal Care,9.1,14.02,3
+P1049,Basmati Rice 5kg,Staples,8.0,12.67,10
+P1050,Wheat Flour 5kg,Staples,6.75,10.65,6
+P1051,Sunflower Oil 1L,Staples,2.42,3.39,14
+P1052,Sugar 1kg,Staples,16.85,26.32,14
+P1053,Toor Dal 1kg,Staples,12.14,16.52,3
+P1054,Salt 1kg,Staples,9.16,11.75,12
+P1055,Tea Powder 500g,Staples,6.88,10.86,14
+P1056,Pasta 500g,Staples,18.54,24.17,5
+P1057,Oats 1kg,Staples,13.79,21.46,3
+P1058,Ghee 500ml,Staples,17.44,27.73,5
+P1059,Chickpeas 1kg,Staples,4.45,5.58,5
+P1060,Honey 500g,Staples,15.39,19.89,5

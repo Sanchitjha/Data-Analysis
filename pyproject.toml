@@ -4,15 +4,16 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "invsales"
-version = "1.0.0"
+version = "2.0.0"
 description = "Inventory & Sales Analytics: ETL, PostgreSQL, Streamlit dashboard, reorder alerts"
 requires-python = ">=3.10"
-dependencies = ["pandas>=2.0", "numpy", "sqlalchemy>=2.0", "psycopg2-binary", "requests"]
+dependencies = ["pandas>=2.0", "numpy", "sqlalchemy>=2.0", "psycopg2-binary", "pyarrow", "requests"]
 
 [project.optional-dependencies]
 dashboard = ["streamlit>=1.30", "plotly>=5.18"]
+api = ["fastapi>=0.110", "uvicorn>=0.29"]
 kaggle = ["kaggle"]
-dev = ["pytest", "pytest-cov", "ruff", "openpyxl", "matplotlib", "nbformat", "nbconvert", "ipykernel"]
+dev = ["pytest", "pytest-cov", "ruff", "httpx", "openpyxl", "nbformat", "nbconvert", "ipykernel"]
 
 [project.scripts]
 invsales = "invsales.cli:main"

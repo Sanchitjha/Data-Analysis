@@ -18,8 +18,8 @@ def _float(name: str, default: float) -> float:
 
 @dataclass(frozen=True)
 class Settings:
-    database_url: str = field(default_factory=lambda: os.getenv(
-        "DATABASE_URL", "postgresql+psycopg2://inventory:inventory@localhost:5432/inventory"))
+    database_url: str = field(default_factory=lambda: os.getenv("DATABASE_URL")
+                              or "postgresql+psycopg2://inventory:inventory@localhost:5432/inventory")
     data_dir: Path = field(default_factory=lambda: Path(os.getenv("DATA_DIR", ROOT / "data")))
     preset: str = field(default_factory=lambda: os.getenv("PRESET", "demo"))
     sql_dir: Path = field(default_factory=lambda: ROOT / "sql")

@@ -3,95 +3,108 @@
 [![CI](https://github.com/Sanchitjha/Data-Analysis/actions/workflows/ci.yml/badge.svg)](https://github.com/Sanchitjha/Data-Analysis/actions)
 [![Live demo](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://data-analysis-05.streamlit.app/)
 
-**Live demo:** https://data-analysis-05.streamlit.app/ (runs on simulated data; free tier apps sleep when idle, the first load may take ~30 s)
+**Live demo:** https://data-analysis-05.streamlit.app/ (simulated data; free-tier apps sleep when idle, the first load may take ~30 s)
 
-End-to-end inventory & sales analytics for a retail/warehouse business: which items sell fast, which sit on the shelf, and what needs
-reordering now. A tested ETL pipeline loads PostgreSQL, a Streamlit dashboard and Power BI model sit on top, and reorder alerts go out via Slack/email.
+A multi-warehouse inventory and sales analytics platform: a tested ETL pipeline loads PostgreSQL (scales to 1.5M+ order lines),
+SQL views, a Streamlit dashboard, a FastAPI service and a Power BI model sit on top, and analytics go beyond reporting to
+**decisions**: what to reorder and how much (safety stock / reorder point / EOQ), demand forecasts, ABC-XYZ segmentation and
+warehouse-to-warehouse transfer suggestions. Reorder alerts run on a schedule via Slack/email.
 
-**Stack:** Python (Pandas, SQLAlchemy) · PostgreSQL · SQL views · Streamlit/Plotly · Power BI (DAX/TMDL) · Excel · Docker · GitHub Actions
+**Stack:** Python (Pandas, NumPy, SQLAlchemy) · PostgreSQL · FastAPI · Streamlit/Plotly · Power BI (DAX/TMDL) · Excel · Docker · GitHub Actions
 
-![dashboard](screenshots/streamlit_dashboard_overview.png)
+![overview](screenshots/app_overview.png)
+
+## What it does
+| Area | Details |
+|---|---|
+| **Data pipeline** | raw CSV -> clean (dedupe, 3 date formats, `$` prices, missing values) -> quality gate (14 checks) -> parquet/CSV -> PostgreSQL via bulk `COPY` in one transaction (idempotent) |
+| **Scale** | `demo` preset: 60 SKUs x 3 warehouses (103k rows, committed, used by the live demo). `large`: 300 SKUs x 6 warehouses x 3 years = **1.47M order lines**, full ETL in 59 s. See [docs/BENCHMARKS.md](docs/BENCHMARKS.md) |
+| **KPIs / SQL** | sales, stock, turnover, days of inventory, fast/slow quartiles (`NTILE`), MoM growth, margin, warehouse comparison: reporting views in `sql/04_views.sql`, cross-checked against pandas in tests |
+| **Replenishment** | per warehouse x product: safety stock `z*sigma*sqrt(L)`, reorder point, EOQ, suggested order qty and cost, gap vs current reorder level |
+| **Forecasting** | 30-day demand per product (level x weekday profile x yoy seasonality, pooled per category) with a holdout **backtest vs a naive baseline** |
+| **ABC-XYZ** | value class (cumulative revenue) x demand variability (CV of monthly rate) |
+| **Transfers** | greedy rebalancing: surplus (> ROP + EOQ) to warehouses short on the same product, before buying |
+| **Dashboard** | 7 tabs (overview, fast/slow, ABC-XYZ, forecast, replenishment, transfers, alerts), filters by warehouse/category/date, CSV downloads |
+| **REST API** | `/kpis /alerts /replenishment /forecast/{id} /abc /transfers /products/{id}` + Swagger at `/docs`, optional `X-API-Key` |
+| **Automation** | daily GitHub Actions job: ETL + alerts (Slack / SMTP), hosted-PostgreSQL ready (Neon/Supabase via `DATABASE_URL`) |
+| **Quality** | 50 tests (unit, property-style, API, **SQL-vs-pandas on real PostgreSQL**), ruff, CI incl. a 1.5M-row scale job, Docker build |
 
 ## Architecture
 ```
-data/raw/*.csv ──► clean (Pandas) ──► validate (quality gate) ──► data/clean/*.csv
- synthetic sim                                   │                     │
- or Kaggle adapter                               ▼                     ▼
-                                     PostgreSQL (tables + views) ──► Power BI (PBIP/DAX)
-                                          │                        ──► Excel summary
-                                          ├──► Streamlit dashboard
-                                          └──► reorder alerts (Slack / email)
+data/<preset>/raw/*.csv ─► clean ─► validate ─► data/<preset>/clean/*.parquet ─► PostgreSQL (tables, indexes, views)
+ synthetic simulator                   (abort on failure)                              │
+ or Kaggle adapter                                                                      ├─► Streamlit dashboard  (falls back to parquet if no DB)
+                                                                                        ├─► FastAPI  /docs
+                                                                                        ├─► Power BI (PBIP/DAX) and Excel
+                                                                                        └─► alerts: Slack / email (cron)
 ```
 | Path | Purpose |
 |---|---|
-| `src/invsales/` | `simulate`, `sources` (synthetic + Kaggle adapter), `clean`, `validate`, `db`, `kpis`, `alerts`, `pipeline`, `cli` |
-| `sql/` | `01_schema` · `02_load_data` (psql `\copy`) · `03_analysis_queries` · `04_views` (reporting views) |
-| `app/streamlit_app.py` | Interactive dashboard: KPI cards, trend, category, fast/slow movers, top products, reorder table, filters |
+| `src/invsales/` | `simulate`, `sources`, `clean`, `validate`, `db`, `repository`, `kpis`, `analytics`, `alerts`, `api`, `pipeline`, `cli` |
+| `sql/` | `01_schema` (5 tables, PK/FK/checks, 4 indexes) · `03_analysis_queries` · `04_views` (reporting views) |
+| `app/streamlit_app.py` | dashboard |
 | `powerbi/` | `Inventory.pbip` (generated TMDL model), `measures.dax`, `BUILD_GUIDE.md`, model CSVs |
-| `excel/` | Workbook: data table + SUMIFS summaries + chart + reorder flags |
-| `tests/` | 27 tests: cleaning, validation, KPIs, simulation, Kaggle adapter, alerts, **SQL-vs-pandas integration on real PostgreSQL** |
-| `notebooks/` | Exploratory notebook (cleaning + EDA walk-through) |
-| `Dockerfile`, `docker-compose.yml`, `.github/workflows/ci.yml` | Packaging and CI |
+| `excel/` | workbook: SUMIFS summaries, warehouse chart, inventory flags, Python replenishment sheet |
+| `notebooks/01_exploration.ipynb` | executed walk-through of the results |
+| `scripts/` | benchmark, Excel/Power BI exports, PBIP + notebook generators |
+| `docs/` | benchmarks |
 
 ## About the data (please read)
-- **Default: synthetic.** `invsales generate` simulates 60 products in 5 categories over 2 years (~62k order lines): demand with seasonality/trend/weekends,
-  a reorder-point policy with supplier lead times, restocks, and 7 products hit by a supplier outage. Then it corrupts the export the way real ones are
-  (duplicates, missing values, 3 date formats, `$` prices, inconsistent category casing) so the cleaning step is real. Seeded and reproducible.
-- **Real sales (optional): Kaggle.** `invsales kaggle` downloads *Store Item Demand Forecasting* and maps it to the same schema. Real: dates, stores,
-  items, units sold. **Not in that dataset and therefore derived:** product names/categories, prices, costs, lead times, and the entire inventory layer
-  (stock, reorder levels, restocks), simulated on top of the real demand. Needs `KAGGLE_USERNAME`/`KAGGLE_KEY` and accepting the competition rules;
-  the adapter is unit-tested on a same-schema fixture but has **not been run against the real download**.
-- No public dataset ships true stock levels for a specific business; describe the inventory layer as simulated when discussing the project.
+- **Default: synthetic.** `invsales generate` simulates warehouses x products x days of demand (seasonality, trend, weekends, warehouse size), a
+  reorder-point policy with supplier lead times, restocks and supplier outages, then corrupts the export the way real ones are so cleaning is
+  real. Seeded and reproducible. All results below are properties of the simulation, not real-world findings.
+- **Real sales (optional): Kaggle.** `invsales kaggle` downloads *Store Item Demand Forecasting* and maps stores to warehouses. Real: dates, stores,
+  items, units sold. **Derived, not in that dataset:** product names/categories/prices/costs/lead times and the whole inventory layer
+  (stock, reorder levels, restocks). Needs `KAGGLE_USERNAME`/`KAGGLE_KEY` and accepting the competition rules; the adapter is unit-tested on a
+  same-schema fixture but **has not been run against the real download**.
+- No public dataset ships true stock levels for a specific business; say the inventory layer is simulated when discussing the project.
 
 ## Quick start
 ```bash
-# Option A - Docker (PostgreSQL + ETL + dashboard):
-docker compose up --build            # dashboard at http://localhost:8501
-docker compose run --rm alerts       # dry-run reorder alert (add --send after configuring .env)
+# Docker: PostgreSQL + ETL + dashboard (:8501) + API (:8000)
+docker compose up --build            # PRESET=large docker compose up --build  for the 1.5M-row dataset
+docker compose run --rm alerts       # dry-run alert (add --send after configuring .env)
 
-# Option B - local
-pip install -e ".[dashboard,dev]"
-cp .env.example .env                 # set DATABASE_URL etc.
-invsales all                         # generate -> clean -> validate -> load PostgreSQL
-streamlit run app/streamlit_app.py   # falls back to data/clean CSVs if PostgreSQL is unreachable
-invsales alerts                      # dry run;  invsales alerts --send  to post to Slack / email
-pytest                               # DB integration tests run only if TEST_DATABASE_URL points at a scratch database (they drop tables!)
+# Local
+pip install -e ".[dashboard,api,dev]"
+cp .env.example .env
+invsales all                         # generate -> clean -> validate -> load PostgreSQL   (invsales --preset large all)
+streamlit run app/streamlit_app.py   # falls back to data/demo/clean if PostgreSQL is unreachable
+uvicorn invsales.api:app --port 8000 # http://localhost:8000/docs
+invsales alerts                      # dry run;  --send to post to Slack / email
+pytest                               # DB integration tests need TEST_DATABASE_URL pointing at a scratch database (they drop tables!)
 ```
 `invsales kaggle [--train-csv path] [--items N]` then `invsales etl` switches the source to Kaggle data.
 Compose uses development credentials (`inventory/inventory`); set `POSTGRES_PASSWORD` for anything shared.
 
+## Model details
+- **Stock turnover** = units sold ÷ average stock, average stock = (opening + current) ÷ 2; **days of inventory** = days selling ÷ turnover
+- **Safety stock** = z · σ(daily demand) · √lead time (z = 1.65 ≈ 95% service level, `SERVICE_LEVEL_Z`)
+- **Reorder point** = mean daily demand · lead time + safety stock · **EOQ** = √(2 · annual demand · ordering cost ÷ (holding rate · unit cost))
+- **Order** (when stock ≤ ROP) = ROP + EOQ − stock · **Transfer surplus** = stock − (ROP + EOQ)
+- **Forecast check** (holdout last 30 days, demo data): weekly WAPE 13.9% vs 15.8% for a flat baseline; on the large preset 10.7% vs 14.0%.
+  It is a transparent statistical baseline, not a tuned ML model; daily error is dominated by small-count noise.
+
+## Results with the default demo data (seed 42)
+- $5.36M sales, 344k units across 3 warehouses; Beverages lead with a summer peak and a Q4 trough
+- 36 of 180 warehouse-product pairs need an order now (≈ $63.6k at cost); 82% have a reorder level below the recommended reorder point
+- 21 "AX" products (high value, stable demand) generate 55% of revenue; 5 transfers could avoid ≈ $850 of purchases
+
 ## Deployment
-The dashboard is deployed on **Streamlit Community Cloud** from `main` (main file `app/streamlit_app.py`, dependencies from `requirements.txt`).
-It falls back to the committed `data/clean/*.csv` when no database is reachable, so no database is needed online; every push to `main` redeploys it.
-Optional: add `DATABASE_URL` in the app's Secrets to read from a hosted PostgreSQL (Neon/Supabase free tier).
-Vercel/Netlify do not fit (Streamlit needs a long-running server); any Docker host (Render, Fly.io, Railway) can run the included `Dockerfile`.
-
-## Pipeline behaviour
-- **Cleaning rules** (`clean.py`): parse 3 date formats; strip currency symbols; dedupe by `order_id` keeping the most complete row; fill missing prices from the product master;
-  missing store → `Unknown`; drop rows with missing/≤0 quantity or unknown product; normalise category text.
-  Counts are written to `data/clean/cleaning_report.json` (default seed: 748 duplicates removed, 621 prices filled, 367 invalid rows dropped).
-- **Quality gate** (`validate.py`): unique keys, no nulls, positive quantities/prices, price > cost, no negative stock, referential integrity, revenue = qty × price.
-  Any failure aborts the ETL before anything is written or loaded.
-- **Load** (`db.py`): schema recreate + load + views in **one transaction** → re-runs are idempotent and readers never see a half-load.
-- **Alerts** (`alerts.py`): severity Stockout / Critical (≤3 days left) / Low, ranked by urgency; Slack webhook and/or SMTP; dry-run unless `--send`.
-
-## KPI definitions
-- **Stock turnover** = units sold ÷ average stock, average stock = (opening stock + current stock) ÷ 2
-- **Days of inventory** = days selling ÷ turnover · **Fast/Slow** = top/bottom quartile of turnover (`NTILE(4)`)
-- **Reorder alert** = `current_stock <= reorder_level`, plus days of stock left at the last-90-day sales rate
-
-## Results with the default data (seed 42)
-- Total sales **$1.79M**, 115k units, gross margin ≈ 30%; Beverages lead (27% of revenue) with a summer peak and a Q4 trough
-- Stock turnover ranges from ~3.3× (Soda Water, Laundry Detergent, Sunflower Oil: overstocked) to ~24× (Trail Mix, Popcorn, Salt)
-- **13 of 60 products are at/below reorder level, 4 are out of stock**
-- These are properties of the simulation, not real-world findings.
+- **Dashboard:** Streamlit Community Cloud from `main` (`app/streamlit_app.py`, deps from `requirements.txt`); it reads the committed `data/demo/clean/*.parquet`,
+  so no database is needed online. Every push to `main` redeploys.
+- **Hosted database (optional):** create a Neon/Supabase PostgreSQL, set `DATABASE_URL=postgresql+psycopg2://USER:PASS@HOST/DB?sslmode=require`
+  (as an app secret / repo secret), run `invsales all` once; the dashboard, API and alerts then read from it.
+- **API / full stack:** `docker compose up` on any Docker host (Render, Fly.io, Railway, a VM).
+- **Scheduled alerts:** `.github/workflows/scheduled.yml` runs daily; add repository secrets `SLACK_WEBHOOK_URL` and/or `SMTP_*` to enable sending.
+- Vercel/Netlify do not fit (Streamlit needs a long-running server).
 
 ## Power BI and Excel
-- `powerbi/Inventory.pbip` is generated by `scripts/build_pbip.py`; it was **not opened in Power BI Desktop** while building this repo. See `powerbi/BUILD_GUIDE.md`
-  (fast path + manual fallback). Add your own `.pbix` and screenshots once you have built the report.
-- `excel/Inventory_Sales_Summary.xlsx` uses SUMIFS summaries (openpyxl cannot author real PivotTables); insert a PivotTable on the `SalesData` table to add one.
-  Formulas were not recalculated in Excel by the generator; check the totals on first open.
+- `powerbi/Inventory.pbip` is generated by `scripts/build_pbip.py`; it was **not opened in Power BI Desktop** while building this repo. See
+  `powerbi/BUILD_GUIDE.md` (fast path + manual fallback). Add your own `.pbix` and screenshots once you have built the report.
+- `excel/Inventory_Sales_Summary.xlsx` uses SUMIFS summaries (openpyxl cannot author real PivotTables); insert a PivotTable on the `SalesData`
+  table to add one. Formulas were not recalculated in Excel by the generator; check the totals on first open.
 
-## Development
-`make test` · `make lint` · CI runs ruff + pytest (with a PostgreSQL service) + an end-to-end ETL and a Docker build.
-`docker-compose.yml` and the Dockerfile have not been executed in the authoring environment (no Docker daemon); CI builds the image.
+## Limitations
+Single-machine benchmarks; full-refresh loads (no incremental/CDC); the forecast is a baseline; replenishment assumes constant lead times and ignores
+minimum order quantities and budget constraints; `docker-compose.yml` has not been run end to end (CI builds the image and runs the pipeline against PostgreSQL).

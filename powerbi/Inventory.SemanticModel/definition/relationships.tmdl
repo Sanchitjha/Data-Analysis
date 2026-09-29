@@ -1,11 +1,27 @@
-relationship 9fc3f443-0f5d-5265-b3fe-af91bed4d402
+relationship 730ac8fa-38f5-5815-b72d-c196df63d1e6
 	fromColumn: fact_sales.product_id
 	toColumn: dim_products.product_id
 
-relationship 6721905f-4987-539d-a2fc-4115dc897502
+relationship ed4eb30c-f138-5a30-9edc-e2135b914159
+	fromColumn: fact_sales.warehouse_id
+	toColumn: dim_warehouses.warehouse_id
+
+relationship 476b56dc-b51b-5d82-9af3-f2f78abb2491
+	fromColumn: fact_sales.order_date
+	toColumn: dim_date.Date
+
+relationship f626a6e0-2317-5d11-ad4e-db5acceaaf9a
+	fromColumn: fact_inventory.product_id
+	toColumn: dim_products.product_id
+
+relationship f96ae072-a598-5963-94f9-b6235b179a93
+	fromColumn: fact_inventory.warehouse_id
+	toColumn: dim_warehouses.warehouse_id
+
+relationship fbee8f2e-9163-5e27-9c6c-7bb17faffbc9
 	fromColumn: fact_restocks.product_id
 	toColumn: dim_products.product_id
 
-relationship c6c4bbdd-8699-5678-8f37-f344d3a5d4fc
-	fromColumn: fact_sales.order_date
-	toColumn: dim_date.Date
+relationship f6452dd9-cf79-599e-a6c5-08fbf1408fc3
+	fromColumn: fact_restocks.warehouse_id
+	toColumn: dim_warehouses.warehouse_id

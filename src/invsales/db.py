@@ -44,16 +44,26 @@ def load_tables(engine: Engine, settings: Settings, tables: dict[str, pd.DataFra
     log.info("loaded rows: %s", counts)
 
 
+def _read_copy(engine: Engine, query: str, **read_csv_kwargs) -> pd.DataFrame:
+    """Server-side COPY -> pandas: several times faster than read_sql for million-row tables."""
+    raw = engine.raw_connection()
+    try:
+        buf = io.StringIO()
+        with raw.cursor() as cur:
+            cur.copy_expert(f"COPY ({query}) TO STDOUT WITH (FORMAT csv, HEADER true)", buf)
+        buf.seek(0)
+        return pd.read_csv(buf, **read_csv_kwargs)
+    finally:
+        raw.close()
+
+
 def read_tables(engine: Engine) -> dict[str, pd.DataFrame]:
-    t = {
-        "warehouses": pd.read_sql("SELECT * FROM warehouses", engine),
-        "products": pd.read_sql("SELECT * FROM products", engine),
-        "inventory": pd.read_sql("SELECT * FROM inventory", engine),
-        "restocks": pd.read_sql("SELECT * FROM restocks", engine, parse_dates=["restock_date"]),
-        "sales": pd.read_sql("SELECT * FROM sales", engine, parse_dates=["order_date"]),
+    return {
+        "warehouses": _read_copy(engine, "SELECT * FROM warehouses"),
+        "products": _read_copy(engine, "SELECT * FROM products"),
+        "inventory": _read_copy(engine, "SELECT * FROM inventory"),
+        "restocks": _read_copy(engine, "SELECT * FROM restocks", parse_dates=["restock_date"]),
+        "sales": _read_copy(engine, "SELECT order_id, order_date, warehouse_id, product_id, quantity, unit_price, revenue "
+                                    "FROM sales", parse_dates=["order_date"],
+                            dtype={"quantity": "int32", "unit_price": "float64", "revenue": "float64"}),
     }
-    for col in ("unit_cost", "unit_price"):
-        t["products"][col] = t["products"][col].astype(float)
-    for col in ("unit_price", "revenue"):
-        t["sales"][col] = t["sales"][col].astype(float)
-    return t

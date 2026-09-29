@@ -1,0 +1,36 @@
+table fact_inventory
+	lineageTag: cbb250f8-90e6-5ea0-98db-8c42a20546bd
+
+	column warehouse_id
+		dataType: string
+		lineageTag: 98737cc7-0ef4-5588-9651-36ab765a9cf6
+		summarizeBy: none
+		sourceColumn: warehouse_id
+
+	column product_id
+		dataType: string
+		lineageTag: b53f96f4-8ad0-5362-bce4-be9794de185d
+		summarizeBy: none
+		sourceColumn: product_id
+
+	column current_stock
+		dataType: int64
+		lineageTag: 4644f960-bd0a-5d08-ae41-43dff8123949
+		summarizeBy: sum
+		sourceColumn: current_stock
+
+	column reorder_level
+		dataType: int64
+		lineageTag: d6569f26-e0c6-5c63-9e44-cfa35b4fd0b5
+		summarizeBy: sum
+		sourceColumn: reorder_level
+
+	partition fact_inventory = m
+		mode: import
+		source =
+				let
+				    Source = Csv.Document(File.Contents(DataFolder & "\fact_inventory.csv"), [Delimiter=",", Encoding=65001, QuoteStyle=QuoteStyle.Csv]),
+				    Promoted = Table.PromoteHeaders(Source, [PromoteAllScalars=true]),
+				    Typed = Table.TransformColumnTypes(Promoted, {{"warehouse_id", type text}, {"product_id", type text}, {"current_stock", Int64.Type}, {"reorder_level", Int64.Type}}, "en-US")
+				in
+				    Typed

@@ -37,24 +37,12 @@ table dim_products
 		summarizeBy: none
 		sourceColumn: lead_time_days
 
-	column reorder_level
-		dataType: int64
-		lineageTag: 5ae57c0e-4c6e-5a66-a9a1-499aec6b7c4f
-		summarizeBy: none
-		sourceColumn: reorder_level
-
-	column current_stock
-		dataType: int64
-		lineageTag: e0ceb450-c8ac-5f44-b573-e3b02f8676af
-		summarizeBy: sum
-		sourceColumn: current_stock
-
 	partition dim_products = m
 		mode: import
 		source =
 				let
 				    Source = Csv.Document(File.Contents(DataFolder & "\dim_products.csv"), [Delimiter=",", Encoding=65001, QuoteStyle=QuoteStyle.Csv]),
 				    Promoted = Table.PromoteHeaders(Source, [PromoteAllScalars=true]),
-				    Typed = Table.TransformColumnTypes(Promoted, {{"product_id", type text}, {"product_name", type text}, {"category", type text}, {"unit_cost", type number}, {"unit_price", type number}, {"lead_time_days", Int64.Type}, {"reorder_level", Int64.Type}, {"current_stock", Int64.Type}}, "en-US")
+				    Typed = Table.TransformColumnTypes(Promoted, {{"product_id", type text}, {"product_name", type text}, {"category", type text}, {"unit_cost", type number}, {"unit_price", type number}, {"lead_time_days", Int64.Type}}, "en-US")
 				in
 				    Typed
