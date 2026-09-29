@@ -17,7 +17,7 @@ warehouse-to-warehouse transfer suggestions. Reorder alerts run on a schedule vi
 ## What it does
 | Area | Details |
 |---|---|
-| **Data pipeline** | raw CSV -> clean (dedupe, 3 date formats, `$` prices, missing values) -> quality gate (14 checks) -> parquet/CSV -> PostgreSQL via bulk `COPY` in one transaction (idempotent) |
+| **Data pipeline** | raw CSV -> clean (dedupe, 3 date formats, `$` prices, missing values) -> quality gate (20+ checks) -> parquet/CSV -> PostgreSQL via bulk `COPY` in one transaction (idempotent) |
 | **Scale** | `demo` preset: 60 SKUs x 3 warehouses (103k rows, committed, used by the live demo). `large`: 300 SKUs x 6 warehouses x 3 years = **1.47M order lines**, full ETL in 59 s. See [docs/BENCHMARKS.md](docs/BENCHMARKS.md) |
 | **KPIs / SQL** | sales, stock, turnover, days of inventory, fast/slow quartiles (`NTILE`), MoM growth, margin, warehouse comparison: reporting views in `sql/04_views.sql`, cross-checked against pandas in tests |
 | **Replenishment** | per warehouse x product: safety stock `z*sigma*sqrt(L)`, reorder point, EOQ, suggested order qty and cost, gap vs current reorder level |
@@ -27,7 +27,7 @@ warehouse-to-warehouse transfer suggestions. Reorder alerts run on a schedule vi
 | **Dashboard** | 7 tabs (overview, fast/slow, ABC-XYZ, forecast, replenishment, transfers, alerts), filters by warehouse/category/date, CSV downloads |
 | **REST API** | `/kpis /alerts /replenishment /forecast/{id} /abc /transfers /products/{id}` + Swagger at `/docs`, optional `X-API-Key` |
 | **Automation** | daily GitHub Actions job: ETL + alerts (Slack / SMTP), hosted-PostgreSQL ready (Neon/Supabase via `DATABASE_URL`) |
-| **Quality** | 50 tests (unit, property-style, API, **SQL-vs-pandas on real PostgreSQL**), ruff, CI incl. a 1.5M-row scale job, Docker build |
+| **Quality** | 50 tests (45 without a test database; unit, API, **SQL-vs-pandas on real PostgreSQL**), ruff, CI incl. a 1.5M-row scale job, Docker build |
 
 ## Architecture
 ```

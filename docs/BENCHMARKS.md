@@ -14,7 +14,7 @@ Absolute numbers depend on hardware; the point is the shape (linear ETL, index e
 ## ETL (raw CSV -> clean -> validate -> PostgreSQL)
 | Step | Time |
 |---|---|
-| Generate raw data (simulation + injected dirt), 1.50M raw rows | ~20 s |
+| Generate raw data (simulation + injected dirt) and CSV read/write, 1.50M raw rows | ~18 s (remainder of the total) |
 | Clean + validate 1.50M rows (dedupe, date parsing, price fill) | 9.7 s |
 | Bulk load with COPY, schema + indexes + views + ANALYZE, one transaction | 31.6 s |
 | **Whole `invsales --preset large all`** | **59 s** |
