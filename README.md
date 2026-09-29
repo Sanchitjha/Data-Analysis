@@ -1,6 +1,9 @@
 # Inventory & Sales Analytics
 
-[![CI](https://github.com/sanchitjha/data-analysis/actions/workflows/ci.yml/badge.svg)](https://github.com/sanchitjha/data-analysis/actions)
+[![CI](https://github.com/Sanchitjha/Data-Analysis/actions/workflows/ci.yml/badge.svg)](https://github.com/Sanchitjha/Data-Analysis/actions)
+[![Live demo](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://data-analysis-05.streamlit.app/)
+
+**Live demo:** https://data-analysis-05.streamlit.app/ (runs on simulated data; free tier apps sleep when idle, the first load may take ~30 s)
 
 End-to-end inventory & sales analytics for a retail/warehouse business: which items sell fast, which sit on the shelf, and what needs
 reordering now. A tested ETL pipeline loads PostgreSQL, a Streamlit dashboard and Power BI model sit on top, and reorder alerts go out via Slack/email.
@@ -57,14 +60,11 @@ pytest                               # DB integration tests run only if TEST_DAT
 `invsales kaggle [--train-csv path] [--items N]` then `invsales etl` switches the source to Kaggle data.
 Compose uses development credentials (`inventory/inventory`); set `POSTGRES_PASSWORD` for anything shared.
 
-## Deploy the dashboard (Streamlit Community Cloud, free)
-Vercel/Netlify are not suitable (they run short-lived serverless functions; Streamlit needs a long-running server).
-The app falls back to the committed `data/clean/*.csv` when no database is reachable, so no database is needed online.
-1. Merge this branch to `main` (or deploy the branch directly).
-2. https://share.streamlit.io → sign in with GitHub → **Create app** → repo `sanchitjha/data-analysis`, branch, main file `app/streamlit_app.py`.
-3. Advanced settings → Python 3.12 → Deploy. Dependencies come from `requirements.txt`.
-4. Put the resulting `*.streamlit.app` URL on your resume/README. Optional: add `DATABASE_URL` in the app's Secrets to read from a hosted PostgreSQL (Neon/Supabase free tier).
-Other options: any Docker host (Render, Fly.io, Railway) using the included `Dockerfile`.
+## Deployment
+The dashboard is deployed on **Streamlit Community Cloud** from `main` (main file `app/streamlit_app.py`, dependencies from `requirements.txt`).
+It falls back to the committed `data/clean/*.csv` when no database is reachable, so no database is needed online; every push to `main` redeploys it.
+Optional: add `DATABASE_URL` in the app's Secrets to read from a hosted PostgreSQL (Neon/Supabase free tier).
+Vercel/Netlify do not fit (Streamlit needs a long-running server); any Docker host (Render, Fly.io, Railway) can run the included `Dockerfile`.
 
 ## Pipeline behaviour
 - **Cleaning rules** (`clean.py`): parse 3 date formats; strip currency symbols; dedupe by `order_id` keeping the most complete row; fill missing prices from the product master;
