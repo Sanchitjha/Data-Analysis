@@ -1,4 +1,4 @@
-# Inventory & Sales Analytics
+# Inventory_Sales_Dashboard
 
 [![CI](https://github.com/Sanchitjha/Data-Analysis/actions/workflows/ci.yml/badge.svg)](https://github.com/Sanchitjha/Data-Analysis/actions)
 [![Live demo](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://data-analysis-05.streamlit.app/)

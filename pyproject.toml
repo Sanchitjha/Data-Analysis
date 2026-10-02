@@ -3,9 +3,9 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "invsales"
+name = "inventory-sales-dashboard"
 version = "2.0.0"
-description = "Inventory & Sales Analytics: ETL, PostgreSQL, Streamlit dashboard, reorder alerts"
+description = "Inventory_Sales_Dashboard: inventory decision support (ETL, PostgreSQL, Streamlit, FastAPI, Power BI)"
 requires-python = ">=3.10"
 dependencies = ["pandas>=2.0", "numpy", "sqlalchemy>=2.0", "psycopg2-binary", "pyarrow", "requests"]
 

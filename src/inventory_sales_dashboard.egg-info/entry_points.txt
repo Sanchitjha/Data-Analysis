@@ -1,0 +1,2 @@
+[console_scripts]
+invsales = invsales.cli:main

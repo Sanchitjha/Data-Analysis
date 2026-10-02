@@ -27,7 +27,7 @@ from invsales.reports import action_pack  # noqa: E402
 from invsales.repository import load_data  # noqa: E402
 from invsales.templates import FILES as TEMPLATES  # noqa: E402
 
-st.set_page_config(page_title="Inventory Decision Support", page_icon=":package:", layout="wide")
+st.set_page_config(page_title="Inventory Sales Dashboard", page_icon=":package:", layout="wide")
 SETTINGS = get_settings()
 NOTE_DEMO = "Demo data is simulated. Results describe the simulation, not a real business."
 
@@ -189,7 +189,7 @@ if s_f.empty:
     st.warning("No sales match the current filters.")
     st.stop()
 
-st.title("Inventory & Sales Decision Support")
+st.title("Inventory Sales Dashboard")
 st.caption(f"{len(sales):,} sales lines - {len(products)} SKUs - {len(warehouses)} locations - {dmin} to {dmax}")
 if has_stock:
     repl_f = A["repl"][A["repl"].warehouse_id.isin(sel_wh) & A["repl"].product_id.isin(p_f.product_id)]

@@ -1,0 +1,29 @@
+Metadata-Version: 2.4
+Name: inventory-sales-dashboard
+Version: 2.0.0
+Summary: Inventory_Sales_Dashboard: inventory decision support (ETL, PostgreSQL, Streamlit, FastAPI, Power BI)
+Requires-Python: >=3.10
+Requires-Dist: pandas>=2.0
+Requires-Dist: numpy
+Requires-Dist: sqlalchemy>=2.0
+Requires-Dist: psycopg2-binary
+Requires-Dist: pyarrow
+Requires-Dist: requests
+Provides-Extra: dashboard
+Requires-Dist: streamlit>=1.30; extra == "dashboard"
+Requires-Dist: plotly>=5.18; extra == "dashboard"
+Requires-Dist: openpyxl; extra == "dashboard"
+Provides-Extra: api
+Requires-Dist: fastapi>=0.110; extra == "api"
+Requires-Dist: uvicorn>=0.29; extra == "api"
+Provides-Extra: kaggle
+Requires-Dist: kaggle; extra == "kaggle"
+Provides-Extra: dev
+Requires-Dist: pytest; extra == "dev"
+Requires-Dist: pytest-cov; extra == "dev"
+Requires-Dist: ruff; extra == "dev"
+Requires-Dist: httpx; extra == "dev"
+Requires-Dist: openpyxl; extra == "dev"
+Requires-Dist: nbformat; extra == "dev"
+Requires-Dist: nbconvert; extra == "dev"
+Requires-Dist: ipykernel; extra == "dev"
