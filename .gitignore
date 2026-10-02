@@ -5,3 +5,4 @@ data/large/
 data/*/raw/
 data/*/clean/*.csv
 .env
+.~lock*

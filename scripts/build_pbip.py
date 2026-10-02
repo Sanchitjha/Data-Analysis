@@ -148,7 +148,9 @@ DATE_TABLE = f"""table dim_date
 \t\t\t\t)
 """
 
-w(SM / "definition.pbism", json.dumps({"version": "4.0", "settings": {}}, indent=2))
+FAB = "https://developer.microsoft.com/json-schemas/fabric/"
+w(SM / "definition.pbism", json.dumps({"$schema": FAB + "item/semanticModel/definitionProperties/1.0.0/schema.json",
+                                      "version": "4.0", "settings": {}}, indent=2))
 w(SM / "definition" / "database.tmdl", "database\n\tcompatibilityLevel: 1600\n")
 w(SM / "definition" / "model.tmdl",
   "model Model\n\tculture: en-US\n\tdefaultPowerBIDataSourceVersion: powerBI_V3\n\tdiscourageImplicitMeasures\n\n"
@@ -173,11 +175,12 @@ w(tables / "fact_inventory.tmdl", table("fact_inventory", INVENTORY))
 w(tables / "dim_date.tmdl", DATE_TABLE)
 w(tables / "_Measures.tmdl",
   f"table _Measures\n\tlineageTag: {uid('_Measures')}\n\n" + "\n".join(MEASURES) +
+  f"\n\tcolumn x\n\t\tdataType: int64\n\t\tisHidden\n\t\tlineageTag: {uid('_Measures_x')}\n\t\tsummarizeBy: none\n\t\tsourceColumn: [x]\n" +
   '\n\tpartition _Measures = calculated\n\t\tmode: import\n\t\tsource = ROW("x", 1)\n')
 
-w(ROOT / "Inventory.pbip", json.dumps({"version": "1.0", "artifacts": [{"report": {"path": "Inventory.Report"}}],
+w(ROOT / "Inventory.pbip", json.dumps({"$schema": FAB + "pbip/pbipProperties/1.0.0/schema.json", "version": "1.0", "artifacts": [{"report": {"path": "Inventory.Report"}}],
                                        "settings": {"enableAutoRecovery": True}}, indent=2))
-w(RP / "definition.pbir", json.dumps({"version": "4.0", "datasetReference": {"byPath": {"path": "../Inventory.SemanticModel"}}},
+w(RP / "definition.pbir", json.dumps({"$schema": FAB + "item/report/definitionProperties/2.0.0/schema.json", "version": "4.0", "datasetReference": {"byPath": {"path": "../Inventory.SemanticModel"}}},
                                      indent=2))
 SCHEMA = "https://developer.microsoft.com/json-schemas/fabric/item/report/definition"
 w(RP / "definition" / "version.json", json.dumps({"$schema": f"{SCHEMA}/versionMetadata/1.0.0/schema.json",
@@ -205,4 +208,135 @@ for name, expr, _, folder in MEASURE_DEFS:
     dax.append(f"{name} = {expr}")
     dax.append("")
 (ROOT / "measures.dax").write_text("\n".join(dax), encoding="utf-8")
+
+# ------------------------------------------------------------------------------------------ report visuals (PBIR)
+VC = FAB + "item/report/definition/visualContainer/2.0.0/schema.json"
+PAGE_DIR = RP / "definition" / "pages" / "InventoryOverview" / "visuals"
+
+
+def lit(v):
+    return {"expr": {"Literal": {"Value": v}}}
+
+
+def col(entity, prop):
+    return {"Column": {"Expression": {"SourceRef": {"Entity": entity}}, "Property": prop}}
+
+
+def meas(prop):
+    return {"Measure": {"Expression": {"SourceRef": {"Entity": "_Measures"}}, "Property": prop}}
+
+
+def agg(entity, prop, fn):          # fn: 0 sum, 3 min, 4 max
+    return {"Aggregation": {"Expression": col(entity, prop), "Function": fn}}
+
+
+def proj(field, ref, native, active=None):
+    p = {"field": field, "queryRef": ref, "nativeQueryRef": native}
+    return p
+
+
+def mproj(name):
+    return proj(meas(name), f"_Measures.{name}", name)
+
+
+def cproj(entity, prop):
+    return proj(col(entity, prop), f"{entity}.{prop}", prop)
+
+
+def visual(name, x, y, w, h, vtype, state, *, sort=None, objects=None, container=None, filters=None):
+    q = {"queryState": state}
+    if sort:
+        q["sortDefinition"] = {"sort": [{"field": f, "direction": d} for f, d in sort]}
+    v = {"visualType": vtype, "query": q, "drillFilterOtherVisuals": True}
+    if objects:
+        v["objects"] = objects
+    if container:
+        v["visualContainerObjects"] = container
+    doc = {"$schema": VC, "name": name, "position": {"x": x, "y": y, "z": 0, "height": h, "width": w, "tabOrder": len(list(PAGE_DIR.glob("*")))},
+           "visual": v}
+    if filters:
+        doc["filterConfig"] = {"filters": filters}
+    w_(PAGE_DIR / name / "visual.json", json.dumps(doc, indent=2))
+
+
+def w_(path, text):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf-8")
+
+
+def title(text):
+    return {"title": [{"properties": {"show": lit("true"), "text": lit(f"'{text}'")}}]}
+
+
+import shutil
+shutil.rmtree(PAGE_DIR, ignore_errors=True)
+RED, GREEN, BLUE = "'#C0392B'", "'#27AE60'", "'#1F3A5F'"
+
+# KPI cards (display units: None -> full numbers)
+for i, (m, color) in enumerate([("Total Sales", BLUE), ("Units Sold", BLUE), ("Total Stock", BLUE), ("Low-Stock Items", RED)]):
+    visual(f"card_{i + 1}", 20 + i * 200, 20, 185, 100, "card", {"Values": {"projections": [mproj(m)]}},
+           objects={"labels": [{"properties": {"labelDisplayUnits": lit("1D"), "color": {"solid": {"color": lit(color)}}}}]})
+
+# slicers
+visual("slicer_warehouse", 840, 20, 140, 100, "slicer", {"Values": {"projections": [cproj("dim_warehouses", "warehouse_name")]}},
+       objects={"data": [{"properties": {"mode": lit("'Dropdown'")}}]}, container=title("Warehouse"))
+visual("slicer_category", 990, 20, 140, 100, "slicer", {"Values": {"projections": [cproj("dim_products", "category")]}},
+       objects={"data": [{"properties": {"mode": lit("'Dropdown'")}}]}, container=title("Category"))
+visual("slicer_date", 1140, 20, 120, 100, "slicer", {"Values": {"projections": [cproj("dim_date", "Date")]}}, container=title("Date range"))
+
+# monthly trend + warehouse comparison
+visual("line_monthly", 20, 140, 520, 280, "lineChart",
+       {"Category": {"projections": [cproj("dim_date", "Month")]}, "Y": {"projections": [mproj("Total Sales")]}},
+       container=title("Monthly sales"))
+visual("column_warehouse", 560, 140, 320, 280, "clusteredColumnChart",
+       {"Category": {"projections": [cproj("dim_warehouses", "warehouse_name")]}, "Y": {"projections": [mproj("Total Sales")]}},
+       sort=[(meas("Total Sales"), "Descending")], container=title("Sales by warehouse"))
+
+
+def topn_filter(name, n, direction):
+    """Classic visual-level Top/Bottom N on product_name by [Stock Turnover]. direction: 2 = descending (top), 1 = ascending (bottom)."""
+    d = {"Name": "d", "Entity": "dim_products", "Type": 0}
+    m = {"Name": "m", "Entity": "_Measures", "Type": 0}
+    sub = {"Version": 2, "From": [d, m],
+           "Select": [{"Column": {"Expression": {"SourceRef": {"Source": "d"}}, "Property": "product_name"}, "Name": "field"}],
+           "OrderBy": [{"Direction": direction, "Expression": {"Measure": {"Expression": {"SourceRef": {"Source": "m"}}, "Property": "Stock Turnover"}}}],
+           "Top": n}
+    return {"name": name, "field": col("dim_products", "product_name"), "type": "TopN",
+            "filter": {"Version": 2,
+                       "From": [{"Name": "subquery", "Expression": {"Subquery": {"Query": sub}}, "Type": 2}, d],
+                       "Where": [{"Condition": {"In": {"Expressions": [{"Column": {"Expression": {"SourceRef": {"Source": "d"}}, "Property": "product_name"}}],
+                                                       "Table": {"SourceRef": {"Source": "subquery"}}}}}]}}
+
+
+def fill(color):
+    return {"dataPoint": [{"properties": {"fill": {"solid": {"color": lit(color)}}}}]}
+
+
+visual("bar_fast", 900, 140, 360, 280, "clusteredBarChart",
+       {"Category": {"projections": [cproj("dim_products", "product_name")]}, "Y": {"projections": [mproj("Stock Turnover")]}},
+       sort=[(meas("Stock Turnover"), "Descending")], objects=fill(GREEN), container=title("Fastest movers (Top 10 stock turnover)"),
+       filters=[topn_filter("flt_top10", 10, 2)])
+visual("bar_slow", 820, 440, 440, 260, "clusteredBarChart",
+       {"Category": {"projections": [cproj("dim_products", "product_name")]}, "Y": {"projections": [mproj("Stock Turnover")]}},
+       sort=[(meas("Stock Turnover"), "Ascending")], objects=fill(RED), container=title("Slowest movers (Bottom 10 stock turnover)"),
+       filters=[topn_filter("flt_bottom10", 10, 1)])
+
+# reorder alert table, REORDER rows only, zero stock highlighted
+stock = agg("fact_inventory", "current_stock", 0)
+reorder_filter = {"name": "flt_reorder", "field": meas("Reorder Status"), "type": "Categorical",
+                  "filter": {"Version": 2, "From": [{"Name": "m", "Entity": "_Measures", "Type": 0}],
+                             "Where": [{"Condition": {"In": {"Expressions": [{"Measure": {"Expression": {"SourceRef": {"Source": "m"}}, "Property": "Reorder Status"}}],
+                                                             "Values": [[{"Literal": {"Value": "'REORDER'"}}]]}}}]}}
+zero_red = {"values": [{"selector": {"metadata": "Sum(fact_inventory.current_stock)"},
+                        "properties": {"backColor": {"solid": {"color": {"expr": {"Conditional": {"Cases": [
+                            {"Condition": {"Comparison": {"ComparisonKind": 0, "Left": stock, "Right": {"Literal": {"Value": "0D"}}}},
+                             "Value": {"Literal": {"Value": "'#F8CBAD'"}}}]}}}}}}}]}
+visual("table_reorder", 20, 440, 780, 260, "tableEx",
+       {"Values": {"projections": [
+           cproj("dim_warehouses", "warehouse_name"), cproj("dim_products", "product_name"),
+           proj(stock, "Sum(fact_inventory.current_stock)", "Sum of current_stock"),
+           proj(agg("fact_inventory", "reorder_level", 0), "Sum(fact_inventory.reorder_level)", "Sum of reorder_level"),
+           mproj("Shortfall"),
+           proj(agg("dim_products", "lead_time_days", 4), "Max(dim_products.lead_time_days)", "Max of lead_time_days")]}},
+       objects=zero_red, container=title("Reorder alerts (stock at or below reorder level)"), filters=[reorder_filter])
 print("PBIP written to", ROOT)

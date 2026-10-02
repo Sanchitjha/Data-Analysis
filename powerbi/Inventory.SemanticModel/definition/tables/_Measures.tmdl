@@ -84,6 +84,13 @@ table _Measures
 		lineageTag: e3abee1b-a2cb-5cce-a261-f1df0f1e3402
 		displayFolder: Inventory
 
+	column x
+		dataType: int64
+		isHidden
+		lineageTag: eebfb11b-aa4f-5862-8ee2-c635e86facb9
+		summarizeBy: none
+		sourceColumn: [x]
+
 	partition _Measures = calculated
 		mode: import
 		source = ROW("x", 1)
