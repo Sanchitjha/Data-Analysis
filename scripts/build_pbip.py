@@ -69,8 +69,8 @@ MEASURE_DEFS = [
      "COUNTROWS(FILTER(fact_inventory, fact_inventory[current_stock] <= fact_inventory[reorder_level]))", "#,0", "Inventory"),
     # opening stock = the stock-in on the first day of history (the simulator/ETL writes one opening row per warehouse x product)
     ("Opening Stock",
-     "CALCULATE(SUM(fact_restocks[quantity]), FILTER(ALL(fact_restocks[restock_date]), "
-     "fact_restocks[restock_date] = CALCULATE(MIN(fact_restocks[restock_date]), ALL(fact_restocks))))", "#,0", "Inventory"),
+     "VAR d = CALCULATE(MIN(fact_restocks[restock_date]), ALL(fact_restocks)) "
+     "RETURN CALCULATE(SUM(fact_restocks[quantity]), fact_restocks[restock_date] = d)", "#,0", "Inventory"),
     ("Average Stock", "DIVIDE([Opening Stock] + [Total Stock], 2)", "#,0.0", "Inventory"),
     ("Stock Turnover", "DIVIDE([Units Sold], [Average Stock])", "0.00", "Inventory"),
     ("Days in Period",

@@ -35,7 +35,7 @@ Total Stock = SUM(fact_inventory[current_stock])
 Low-Stock Items = COUNTROWS(FILTER(fact_inventory, fact_inventory[current_stock] <= fact_inventory[reorder_level]))
 
 // [Inventory]
-Opening Stock = CALCULATE(SUM(fact_restocks[quantity]), FILTER(ALL(fact_restocks[restock_date]), fact_restocks[restock_date] = CALCULATE(MIN(fact_restocks[restock_date]), ALL(fact_restocks))))
+Opening Stock = VAR d = CALCULATE(MIN(fact_restocks[restock_date]), ALL(fact_restocks)) RETURN CALCULATE(SUM(fact_restocks[quantity]), fact_restocks[restock_date] = d)
 
 // [Inventory]
 Average Stock = DIVIDE([Opening Stock] + [Total Stock], 2)

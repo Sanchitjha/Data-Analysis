@@ -46,7 +46,7 @@ table _Measures
 		formatString: #,0
 		displayFolder: Inventory
 
-	measure 'Opening Stock' = CALCULATE(SUM(fact_restocks[quantity]), FILTER(ALL(fact_restocks[restock_date]), fact_restocks[restock_date] = CALCULATE(MIN(fact_restocks[restock_date]), ALL(fact_restocks))))
+	measure 'Opening Stock' = VAR d = CALCULATE(MIN(fact_restocks[restock_date]), ALL(fact_restocks)) RETURN CALCULATE(SUM(fact_restocks[quantity]), fact_restocks[restock_date] = d)
 		lineageTag: b110bd3f-d5a3-5786-9f63-87fec55e2c4c
 		formatString: #,0
 		displayFolder: Inventory
