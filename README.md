@@ -1,6 +1,6 @@
 # Inventory_Sales_Dashboard
 
-[![CI](https://github.com/Sanchitjha/Data-Analysis/actions/workflows/ci.yml/badge.svg)](https://github.com/Sanchitjha/Data-Analysis/actions)
+[![CI](https://github.com/Sanchitjha/Inventory_Sales_Dashboard/actions/workflows/ci.yml/badge.svg)](https://github.com/Sanchitjha/Inventory_Sales_Dashboard/actions)
 [![Live demo](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://data-analysis-05.streamlit.app/)
 
 **Live demo:** https://data-analysis-05.streamlit.app/ (simulated data; free-tier apps sleep when idle, the first load may take ~30 s)
@@ -55,7 +55,7 @@ data/<preset>/raw/*.csv ─► clean ─► validate ─► data/<preset>/clean/
 | `excel/` | workbook: SUMIFS summaries, warehouse chart, inventory flags, Python replenishment sheet |
 | `notebooks/01_exploration.ipynb` | executed walk-through of the results |
 | `scripts/` | benchmark, Excel/Power BI exports, PBIP + notebook generators |
-| `docs/` | `USER_GUIDE.md`, `BENCHMARKS.md`, sample action pack |
+| `docs/` | `USER_GUIDE.md`, `BENCHMARKS.md`, `DESIGN_DECISIONS_FAQ.md`, sample action pack |
 | `templates/` | sample input files (`invsales templates`) |
 
 ## About the data (please read)
